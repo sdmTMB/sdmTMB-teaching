@@ -82,7 +82,7 @@ dat$year_factor <- as.factor(dat$year)
 
 # Constructing a mesh
 
-We start by constructing an SPDE mesh with INLA. This creates some matrices that are used internally when fitting the model. We will use the shortcut function `make_mesh()` and use a cutoff (minimum triangle length of 10 km). Note: this is the only parameter that can be changed in `make_mesh()` but more control over mesh arguments can be done with INLA (`inla.mesh.2d()`).
+We start by constructing an SPDE mesh with fmesher. This creates some matrices that are used internally when fitting the model. We will use the shortcut function `make_mesh()` and use a cutoff (minimum triangle length of 10 km). Note: this is the only parameter that can be changed in `make_mesh()` but more control over mesh arguments can be done with fmesher itself.
 
 ```{r}
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), cutoff = 10)
@@ -100,7 +100,7 @@ ggplot() + inlabru::gg(mesh$mesh) + coord_fixed() +
 
 # Fitting a spatial model
 
-The most basic model we could fit would be a model with a single spatial random field, and no covariates. This is similar to what we were fitting yesterday. Using `silent = FALSE` lets us see what is happening, but it's awkward when running code in Rmd/Quarto chunks (with the default RStudio setting to 'Show output inline for all R Markdown document') so we will comment it out in most cases here. But it is a good idea to use it if models are running slowly or not converging to monitor progress.
+The most basic model we could fit would be a model with a single spatial random field and no covariates. This is similar to what we were fitting yesterday. Using `silent = FALSE` lets us see what is happening, but it's awkward when running code in Rmd/Quarto chunks (with the default RStudio setting to 'Show output inline for all R Markdown document') so we will comment it out in most cases here. But it is a good idea to use it if models are running slowly or not converging to monitor progress.
 
 ```{r, results='hide'}
 fit_spatial <- sdmTMB(
@@ -117,21 +117,15 @@ fit_spatial <- sdmTMB(
 sanity(fit_spatial)
 ```
 
-Did it have trouble? If so, try an extra optimization run and see if that's sufficient:
-
-```{r}
-fit_spatial <- run_extra_optimization(fit_spatial)
-sanity(fit_spatial)
-```
+Does everything look OK?
 
 ```{r}
 fit_spatial
 ```
 
-
 ### Exercise:
 
-A refresher from yesterday:
+A refresher from before:
 
 1.  What is the 'Matern range' in the output?
 2.  What is the 'Spatial SD' in the output?
@@ -172,26 +166,26 @@ cv_depth <- sdmTMB_cv(
 )
 ```
 
-These are the expected log predictive densities (ELPD) for each fold. Larger (more positive) values are better. This gives us an idea of the variance of these values across folds.
+These are the log predictive densities for each fold. Larger (more positive) values are better. This gives us an idea of the variance of these values across folds.
 
 ```{r}
-cv_intercept$fold_elpd
-cv_depth$fold_elpd
+cv_intercept$fold_loglik
+cv_depth$fold_loglik
 
 # check each fold between the two models:
-cv_depth$fold_elpd - cv_intercept$fold_elpd
+cv_depth$fold_loglik - cv_intercept$fold_loglik
 ```
 
-These are the expected log predictive densities for all left out data combined. 
+These are the log predictive densities for all left out data combined.
 
 ```{r}
-cv_intercept$elpd
-cv_depth$elpd
+cv_intercept$sum_loglik
+cv_depth$sum_loglik
 ```
 
 ### Exercise:
 
-1.  Which model does ELPD suggest has better out-of-sample predictive performance?
+1.  Which model does the log predictive density suggest has better out-of-sample predictive performance?
 2.  How consistent is that result across folds?
 3.  Try changing the 'seed' value above (same value for both). Is the same model selected?
 4.  This cross validation created the folds randomly. Which argument in `?sdmTMB_cv` would let you assign IDs to the folds to create spatially blocked cross validation?
@@ -242,13 +236,13 @@ sanity(fit)
 We can use the tidy function to get the coefficients for the fixed effects:
 
 ```{r}
-tidy(fit, conf.int = TRUE)
+tidy(fit)
 ```
 
 and by setting `effects = "ran_pars"`, we can extract the variance and random effect components:
 
 ```{r}
-tidy(fit, effects = "ran_pars", conf.int = TRUE)
+tidy(fit, effects = "ran_pars")
 ```
 
 There are multiple ways we can plot the depth effect on density. First, we can create a new data frame of all potential values, setting the other predictors (here year) to a fixed value.
@@ -270,35 +264,26 @@ ggplot(p, aes(log_depth, exp(est),
   geom_line() + geom_ribbon(alpha = 0.4)
 ```
 
-The second approach is to pass the sdmTMB object to the visreg package. This shows the conditional effect, where all values other than depth are held at a particular value. Note the default visreg plot is in link (here, log) space and the dots are randomized quantile residuals.
+We could also use the `ggeffects` package. For more details see the [visualizing marginal effects vignette](https://pbs-assess.github.io/sdmTMB/articles/ggeffects.html).
 
 ```{r}
-visreg::visreg(fit, xvar = "log_depth")
-visreg::visreg(fit, xvar = "log_depth", scale = "response")
-```
-
-Third, we could use the `ggeffects` package, which can be used to show the marginal effects of predictors (averaging over all other covariates rather than using a single fixed value). For more details see the [visualizing marginal effects vignette](https://pbs-assess.github.io/sdmTMB/articles/ggeffects.html). *Note that won't yet work with smoother `s()` terms*, but will soon work with the similar `ggeffects::ggpredict()` .
-
-```{r}
-g <- ggeffects::ggeffect(fit, "log_depth [3.5:6.7 by=0.05]")
-plot(g)
+ggeffects::ggpredict(fit, "log_depth [all]") |> plot()
 ```
 
 # Prediction
 
-Let's now predict on a grid that covers the entire survey (`wcvi_grid`).
+Let's now predict on a grid that covers the entire survey (`wcvi_grid`). This object is built into the sdmTMB package.
+
+We can use the `sdmTMB::replicate_df()` function to replicate our survey grid for each year:
 
 ```{r}
-wcvi_grid <- readRDS(here::here("dfo-tesa-2023/data/wcvi-grid.rds"))
-head(wcvi_grid)
-wcvi_grid$log_depth <- log(wcvi_grid$depth)
-```
-
-We can use this fancy line of purrr code to expand our grid to every year we want to predict on:
-
-```{r}
-grid <- purrr::map_dfr(unique(dat$year), ~ tibble(wcvi_grid, year = .x))
-grid$year_factor <- as.factor(grid$year)
+grid <- replicate_df(
+  wcvi_grid, time_name = "year", 
+  time_values = unique(dat$year)
+)
+# add back any missing predictors:
+grid$log_depth <- log(grid$depth)
+grid$year_factor <- factor(grid$year)
 head(grid)
 ```
 
@@ -386,21 +371,7 @@ qqnorm(dat$resid)
 qqline(dat$resid)
 ```
 
-These don't look great, *but*, this is largely a function of error from the Laplace approximation on the random effects (see [Thygesen et al. 2017](https://doi.org/10.1007/s10651-017-0372-4)). MCMC-based are a better approach, but are slower. The following line of code will take a while to run and will require rstan and tmbstan. You may *not* want to run it. There's a whole vignette on residual checking with sdmTMB here: <https://pbs-assess.github.io/sdmTMB/articles/residual-checking.html> It's an active area of research.
-
-```{r, eval=FALSE}
-# warning: will take a couple minutes and requires rstan!
-# see ?residuals.sdmTMB
-set.seed(1)
-dat$resid_mcmc <- residuals(
-  fit, 
-  type = "mle-mcmc", 
-  mcmc_iter = 201, 
-  mcmc_warmup = 200
-)
-qqnorm(dat$resid_mcmc)
-qqline(dat$resid_mcmc)
-```
+There's a whole vignette on residual checking with sdmTMB here: <https://pbs-assess.github.io/sdmTMB/articles/residual-checking.html>
 
 We can simulate new observations from the model and check properties of the simulation compared to the observed data:
 

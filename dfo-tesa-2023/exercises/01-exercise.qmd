@@ -366,3 +366,4 @@ plot(sim_dat4$mu, p$est, main = "GLM with random fields",
 1.  How do the residuals look now? Why?
 2.  How do the predictions look compared to before? Why?
 3.  How do the random fields look? Is this as good as you expected? What would make these easier/harder to estimate?
+
