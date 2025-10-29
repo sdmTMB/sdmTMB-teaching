@@ -41,12 +41,13 @@
 - [ ] Drop barriers lectures
 - [ ] Drop presence-only lectures
 - [ ] Expand 'comparing models' into model validation: add simulation-based residuals, simulation and re-fitting, deviance explained. New slides and content in exercises.
-- [ ] New slides on deviance explained in comparison lecture
+- [x] New slides on deviance explained in comparison lecture
 - [x] New slides on Poisson-link delta models
 - [x] New slides on generalized gamma
 - [ ] Add generalized gamma and/or Poisson-link into exercises?
-- [ ] New slides in spatiotemporal lectures motivating spatiotemporal fields 
+- [ ] New slides in spatiotemporal lectures motivating spatiotemporal fields
 - [ ] Tweak the 03-exercise to also try time-varying effects and spatially varying effects
+- [ ] Deviance explained in exercises - with Tweedie or NB2
 
 # Old plan for the 4-day course
 

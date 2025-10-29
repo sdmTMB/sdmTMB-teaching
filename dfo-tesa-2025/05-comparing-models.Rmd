@@ -1,9 +1,9 @@
 ---
-title: "Model selection with sdmTMB"
+title: "Model comparison and validation with sdmTMB"
 subtitle: "DFO TESA sdmTMB workshop"
 author: ""
 institute: ""
-date: "January 16--19 2023"
+date: "November 4--6 2025"
 output:
   xaringan::moon_reader:
     css: ["xaringan-themer.css", "theme.css"]
@@ -28,27 +28,31 @@ library(ggplot2)
 
 # What is the goal of modeling? 
 
-* Straight prediction?
-  * in-sample, out-of-sample, both?
+Prediction?
+* in-sample, out-of-sample?
+* what kind of out-of-sample?
+  
+Hypothesis testing or causal inference
 
-* Parsimony?
-  * balance of bias-variance tradeoff
-
-* Not all metrics appropriate for all applications
+Not all metrics appropriate for all applications
 
 ---
 
 # Too many metrics to discuss
 
-* Root mean squared error 
+.small[
+* Root mean squared error, median absolute relative error, ...
 
-* AUC (see pseudo-absence example)
-  * true and false positive rates
+* AUC: true and false positive rates
 
-* AIC: widely used tool in ecology
+* AIC
+  * widely used tool in ecology
   * $\mathrm{AIC} = -2 \log L + 2K$, where $K$ is the number of parameters
   * designed for fixed effects models (Burnham and Anderson 2002)
   
+* Deviance explained
+]
+
 ---
 
 # AIC and likelihood with sdmTMB
@@ -95,7 +99,7 @@ fit <- sdmTMB(..., reml = FALSE)
 
 Random effects include
 
-* random intercepts: `(1 | group)`
+* random intercepts and slopes: `(1 + x | group)`
 * smooth terms: `s(year)`
 * time-varying coefficients
 * all random fields
@@ -103,8 +107,9 @@ Random effects include
 
 ---
 
-# Limitations of AIC
+# Limitations of (marginal) AIC
 
+.small[
 * Originally conceived for fixed effects 
   * Burnham and Anderson (2002)
 
@@ -113,6 +118,11 @@ Random effects include
   * Liang et al. (2008)
   
 * Great [FAQ on `glmmTMB` by Ben Bolker](https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#can-i-use-aic-for-mixed-models-how-do-i-count-the-number-of-degrees-of-freedom-for-a-random-effect)
+
+* Conditional AIC: less widely used, computationally harder
+  * Thorson 2024: <https://doi.org/10.1002/ecy.4327> for GMRF models
+  * Also built into sdmTMB
+]
 
 ---
 
@@ -124,20 +134,22 @@ Random effects include
 
 * Objective function:
   * maximize log-likelihood of test data
+  * also known as "log predictive density" or "log score"
+  * or use a domain-specific metric you care about
 
 ---
 
-# ELPD
-
-Expected log pointwise predictive density
+# Log predictive density
 
 Interpreted as theoretical expectation for new dataset  
   
-ELPD: $\frac{\log ( \sum( \exp( \log L(y^*|\theta))))} {N}$,
+Defined as the sum of the log likelihoods for left-out data. Sometimes averaged per data point
 
-where: $y^*$ are left-out data, $\theta$ are parameters, and $N$ is the number of left-out data points
+Analogous to ELPD in Bayesian literature
 
-[Vehtari, Gelman, and Gabry (2017)](https://arxiv.org/abs/1507.04544)
+Higher is better; only makes sense when comparing models fit to the same data!
+
+Great [FAQ on cross validation](https://users.aalto.fi/~ave/CV-FAQ.html) by Aki Vehtari
 
 ---
 
@@ -157,7 +169,7 @@ fit <- sdmTMB_cv( #<<
   data = pcod,
   mesh = mesh,
   family = binomial(link = "logit"),
-  k_folds = 8, #<<
+  k_folds = 8, #<< 
   fold_ids = NULL, #<<
   parallel = TRUE, #<<
   use_initial_fit = FALSE #<<
@@ -165,9 +177,11 @@ fit <- sdmTMB_cv( #<<
 ```
 ]
 
-* More folds = more computation time
-* `use_initial_fit = TRUE` 
-  * fits first fold, and initializes subsequent model fits from that  
+.xsmall[
+* More folds = more computation time but less cross validation variance and bias
+* `use_initial_fit = TRUE`: fits first fold, and initializes subsequent model fits from that
+* Uses the same mesh for all folds if `mesh` is supplied (you probably want this)
+]
 
 ---
 
@@ -175,15 +189,15 @@ fit <- sdmTMB_cv( #<<
 
 `sdmTMB_cv()` returns:  
 
-- A list of models (each `sdmTMB()` object)  
+- `models`: A list of models (each `sdmTMB()` object)
+
+- `data`: Original data plus columns for fold ID, CV predicted value, and CV log likelihood
 
 - `fold_loglik`: sum of held out likelihoods for each fold
 
-- `sum_loglik`: sum across `fold_loglik`, or all data
+- `sum_loglik`: sum of held out likelihoods across all data
 
-- `fold_elpd`: expected log predictive density for each fold
-
-- `elpd`: Expected log predictive density across all data
+- and more...
 
 ---
 
@@ -219,8 +233,169 @@ m_cv <- sdmTMB_cv( #<<
   k_folds = 2 #<<
 )
 # Sum of log likelihoods of left-out data:
-m_cv$sum_loglik
-# Expected log pointwise predictive density
-# of left-out data:
-m_cv$elpd
+m_cv$sum_loglik # higher is better
 ```
+
+---
+
+class: center, middle, inverse
+
+# Deviance explained
+
+---
+
+# Deviance explained
+
+* Deviance explained measures how much of the variation in the data is captured by the model compared to a null (usually intercept-only) model
+
+* Analogous to an R² for models fit with likelihood methods (e.g., GLMs, GAMs, or GLMMs)
+
+* Calculated as `1 − (model deviance / null deviance)`; higher values indicate a better fit
+
+* Can also be used to compare % increase in deviance explained between two models fit to the same data
+
+---
+
+# Deviance explained in sdmTMB
+
+```{r, echo=TRUE}
+mesh <- make_mesh(pcod, c("X", "Y"), cutoff = 10)
+fit <- sdmTMB(
+  density ~ depth_scaled,
+  spatial = "on", 
+  mesh = mesh,
+  family = delta_gamma(), 
+  data = pcod,
+)
+
+# model with *only* intercept and no random fields:
+fit_null <- update(
+  fit, 
+  formula. = density ~ 1, #<<
+  spatial = "off" #<<
+)
+
+# proportion deviance explained:
+1 - deviance(fit) / deviance(fit_null)
+```
+
+---
+
+# Proportional reduction in deviance by model component
+
+We can quantify how much better the model fits when adding a smoother or spatial field by comparing model deviances.
+
+Let's fit a model with a depth smoother and spatial random field:
+
+```{r, echo=TRUE}
+fit <- sdmTMB(
+  present ~ s(depth_scaled),
+  spatial = "on", 
+  mesh = mesh,
+  family = binomial(), 
+  data = pcod,
+)
+```
+
+---
+
+# Deviance reduction by component
+
+Fit some sub-models for comparison:
+
+```{r, echo=TRUE}
+# same model with no random fields:
+fit_depth_only <- update(
+  fit, 
+  spatial = "off" #<<
+)
+# same model with no depth smoother:
+fit_rf_only <- update(
+  fit, 
+  formula. = . ~ 1 #<<
+)
+# null model
+fit_null <- update(
+  fit,
+  spatial = "off", #<<
+  formula. = . ~ 1 #<<
+)
+```
+
+---
+
+### Deviance reduction by component
+
+.small[
+Proportional deviance explained by depth:
+
+```{r, echo=TRUE}
+1 - deviance(fit_depth_only) / deviance(fit_null)
+```
+]
+
+--
+
+.small[
+Proportional reduction in model deviance by depth beyond what the spatial field explains:
+
+```{r, echo=TRUE}
+1 - deviance(fit) / deviance(fit_rf_only)
+```
+]
+
+--
+
+.small[
+Proportional reduction in model deviance by the random field beyond what the depth smoother explains:
+
+```{r, echo=TRUE}
+1 - deviance(fit) / deviance(fit_depth_only)
+```
+]
+
+---
+
+# Caveats with deviance comparisons
+
+.small[
+Must be fit to the same response data
+]
+
+--
+
+.small[
+Components can explain overlapping patterns in the data, so their deviance reductions don't add up neatly
+]
+
+--
+
+.small[
+Some families [require you to fix](https://github.com/pbs-assess/sdmTMB/discussions/471) distribution parameters between comparisons: Negative binomial, Tweedie, Generalized gamma, Lognormal
+]
+
+--
+
+.small[
+But these common families are fine (shape or dispersion parameters affect variance linearly or don't exist): Gaussian, Gamma, Poisson, Binomial
+]
+
+--
+
+.small[
+We may write a helper function for this soon!
+]
+
+---
+
+# But I want a pseudo-R²!
+
+In non-Gaussian or spatial GLMMs, variance partitioning becomes hard to interpret because "variance" depends on the link and distribution.
+
+--
+
+Comparing proportional reductions in deviance is often clearer.
+
+--
+
+But, yes, we've been working on a psuedo-R², but there are some technical + theoretical issues remaining.
