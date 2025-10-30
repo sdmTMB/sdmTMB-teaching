@@ -1,0 +1,226 @@
+---
+title: "Combining survey data with different catchabilities"
+format: html
+editor: visual
+execute: 
+  echo: true
+  eval: true
+---
+
+# Goals:
+
+-   Gain exposure to combining survey data from two surveys with different capabilities
+-   Gain familiarity working with offsets
+-   Gain exposure to working with spatially varying coefficients
+-   Gain exposure to working with count (longline) data
+-   Practice the common routine of generating an area-weighted index of abundance
+
+# Setup
+
+```{r}
+#| echo=FALSE
+library(sdmTMB)
+library(ggplot2)
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+theme_set(theme_light())
+```
+
+# Data
+
+Let's read in some data from the HBLL (Hard Bottom Longline) and IPHC (International Pacific Halibut Commission) longline surveys:
+
+```{r}
+dat <- readRDS(here::here("dfo-tesa-2025/data/dogfish-hbll-iphc.rds"))
+head(dat)
+table(dat$survey)
+```
+
+Visualize it:
+
+```{r}
+ggplot(dat, aes(longitude, latitude, size = catch_count, colour = survey)) +
+  geom_point(alpha = 0.2, pch = 21) +
+  facet_wrap(~year)
+```
+
+Add UTM columns:
+
+```{r}
+dat <- add_utm_columns(dat, c("longitude", "latitude"), utm_crs = 32609)
+```
+
+# Modelling
+
+Generate a finite-element mesh:
+
+```{r}
+mesh <- make_mesh(dat, c("X", "Y"), cutoff = 15)
+plot(mesh)
+```
+
+We will turn our survey column into a factor with explicit levels so we keep track of which one is the base level that we ultimately want to predict on.
+
+We are effectively converting all observations into HBLL observations.
+
+```{r}
+dat$survey <- factor(dat$survey, levels = c("HBLL", "IPHC"))
+```
+
+Fit our model:
+
+```{r}
+fit <- sdmTMB(
+  catch_count ~ factor(year) + factor(survey),
+  family = nbinom2(),
+  data = dat,
+  mesh = mesh,
+  time = "year",
+  spatial = "on",
+  spatiotemporal = "iid",
+  silent = TRUE,
+  anisotropy = TRUE,
+  offset = log(dat$hook_count)
+)
+```
+
+Inspect our model:
+
+```{r}
+sanity(fit)
+print(fit)
+tidy(fit)
+tidy(fit, "ran_pars")
+```
+
+Visualize the anisotropy:
+
+```{r}
+plot_anisotropy(fit)
+```
+
+We can check simulation based residuals:
+
+```{r}
+set.seed(123)
+s <- simulate(fit, nsim = 200, type = "mle-mvn")
+dharma_residuals(s, fit)
+```
+
+And compare the properties of our simulated observations to our real ones. For example:
+
+```{r}
+mean(s == 0)
+mean(dat$catch_count == 0)
+```
+
+Let's pull in the survey grid:
+
+```{r}
+grid_one <- readRDS(here::here("dfo-tesa-2025/data/hbll-s-grid.rds"))
+grid <- sdmTMB::replicate_df(grid_one, "year", sort(unique(dat$year)))
+```
+
+And add UTM columns **with the same CRS**:
+
+```{r}
+grid <- add_utm_columns(grid, c("longitude", "latitude"), utm_crs = 32609)
+```
+
+Encode our survey column for the survey that we want to predict on:
+
+```{r}
+grid$survey <- factor("HBLL", levels = c("HBLL", "IPHC"))
+```
+
+And make our predictions on the grid:
+
+```{r}
+pred <- predict(fit, newdata = grid, return_tmb_object = TRUE)
+```
+
+Then we can calculate our area-weighted index of relative abundance:
+
+```{r}
+ind <- get_index(pred, bias_correct = TRUE)
+```
+
+And plot it:
+
+```{r}
+ggplot(ind, aes(year, est, ymin = lwr, ymax = upr)) +
+  geom_ribbon(fill = "grey70", colour = NA) +
+  geom_line() + ylab("Relative abundance")
+```
+
+# Experimenting with spatially varying catchability
+
+A recent area of research is exploring letting catchability vary spatially in these models. We can do that by adding a spatially varying coefficient for survey ID:
+
+```{r}
+fit2 <- sdmTMB(
+  catch_count ~ factor(year) + factor(survey),
+  family = nbinom2(),
+  data = dat,
+  mesh = mesh,
+  time = "year",
+  spatial = "on",
+  spatial_varying = ~ factor(survey), #<
+  spatiotemporal = "iid",
+  silent = FALSE,
+  anisotropy = TRUE,
+  offset = log(dat$hook_count)
+)
+```
+
+```{r}
+sanity(fit2)
+fit2
+```
+
+Compare our models with AIC:
+
+```{r}
+AIC(fit, fit2)
+```
+
+Here, AIC favours the model with the spatially varying catchability.
+
+We can visualize that spatially varying catchability on our survey grid:
+
+```{r}
+# pick any year
+pred2 <- predict(fit2, newdata = dplyr::filter(grid, year == 2024))
+```
+
+To do that we need to add our catchability main effect with the spatially varying random field:
+
+```{r}
+b <- tidy(fit2)
+q_fixed_effect <- b$estimate[b$term == "factor(survey)IPHC"]
+
+ggplot(pred2, 
+  aes(X, Y, fill = exp(q_fixed_effect + `zeta_s_factor(survey)IPHC`))
+) +
+  geom_tile(width = 2, height = 2) +
+  scale_fill_viridis_c() +
+  labs(fill = "Catchability")
+```
+
+# Closing discussion points
+
+-   We modelled "relative abundance" by summing predicted values on a survey grid but with counts of dogfish per hook. What are we actually looking at in our index plot?
+
+-   What more could we do to check if our spatially varying catchability model makes sense?
+
+-   Does our model account for length selectivity?
+
+-   If not, how might we do that?
+
+-   What are the advantages of combining these surveys into one composite index?
+
+-   What are the disadvantages of doing this?
+
+-   Does the negative binomial actually make most sense here as a family?
+
+-   What is slightly wrong with it and what would (several) alternatives be?
