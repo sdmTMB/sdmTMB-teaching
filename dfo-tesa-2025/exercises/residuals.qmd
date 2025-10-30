@@ -1,0 +1,75 @@
+---
+title: "Residuals"
+format: html
+editor: visual
+---
+
+```{r libs, include=FALSE}
+library(dplyr)
+library(sdmTMB)
+library(ggplot2)
+```
+
+```{r}
+set.seed(1)
+predictor_dat <- data.frame(X = runif(1000), Y = runif(1000), a1 = rnorm(1000))
+mesh <- make_mesh(predictor_dat, xy_cols = c("X", "Y"), cutoff = 0.1)
+dat <- sdmTMB_simulate(
+  formula = ~ 1 + a1,
+  data = predictor_dat,
+  mesh = mesh,
+  family = nbinom2(link = "log"),
+  phi = 0.4,
+  range = 0.4,
+  sigma_O = 0.4,
+  seed = 1,
+  B = c(0.2, 0.8) # B0 = intercept, B1 = a1 slope
+)
+```
+
+```{r}
+fit_pois <- sdmTMB(observed ~ a1, data = dat, family = poisson(), mesh = mesh)
+fit_nb2 <- update(fit_pois, family = nbinom2())
+fit_nb2_miss <- update(fit_nb2, formula. = observed ~ 1)
+```
+
+```{r}
+set.seed(123)
+rq_res <- residuals(fit_pois, type = "mle-mvn")
+rq_res <- rq_res[is.finite(rq_res)] # some Inf
+qqnorm(rq_res);abline(0, 1)
+```
+
+```{r}
+set.seed(123)
+rq_res <- residuals(fit_nb2, type = "mle-mvn")
+qqnorm(rq_res);abline(0, 1)
+```
+
+```{r}
+s_pois <- simulate(fit_pois, nsim = 200, type = "mle-mvn")
+s_nb2 <- simulate(fit_nb2, nsim = 200, type = "mle-mvn")
+```
+
+```{r}
+dharma_residuals(s_pois, fit_pois)
+dharma_residuals(s_nb2, fit_nb2)
+```
+
+```{r}
+r_pois <- dharma_residuals(s_pois, fit_pois, return_DHARMa = TRUE)
+plot(r_pois)
+DHARMa::testResiduals(r_pois)
+DHARMa::testSpatialAutocorrelation(r_pois, x = dat$X, y = dat$Y)
+DHARMa::testZeroInflation(r_pois)
+```
+
+```{r}
+s_nb2_miss <- simulate(fit_nb2_miss, nsim = 200, type = "mle-mvn")
+r_nb2_miss <- dharma_residuals(s_nb2_miss, fit_nb2_miss, return_DHARMa = TRUE)
+DHARMa::plotResiduals(r_nb2_miss, form = dat$a1)
+```
+
+
+
+
