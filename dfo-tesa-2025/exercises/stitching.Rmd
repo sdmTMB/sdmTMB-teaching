@@ -1,0 +1,150 @@
+
+```{r}
+d <- readRDS("~/src/gfsynopsis-2024/report/data-cache-2025-03/quillback-rockfish.rds")
+d <- d$survey_sets
+library(ggplot2)
+library(dplyr)
+
+unique(d$survey_abbrev)
+d <- filter(d, survey_abbrev %in% c("HBLL INS N", "HBLL INS S"))
+
+ggplot(d, aes(longitude, latitude, size = density_ppkm2)) +
+  geom_point(pch = 21) +
+  facet_wrap(~year)
+
+library(sdmTMB)
+d <- add_utm_columns(d, utm_crs = 32610)
+
+d <- filter(d, !(year == 2021 & survey_abbrev == "HBLL INS S"))
+mesh <- make_mesh(d, c("X", "Y"), cutoff = 10)
+fit <- sdmTMB(density_ppkm2 ~ factor(year), data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE)
+
+plot_anisotropy(fit)
+```
+
+
+```{r}
+g <- gfplot::hbll_inside_n_grid$grid |> rename(longitude = X, latitude = Y)
+g <- add_utm_columns(g, c("longitude", "latitude"), utm_crs = 32610)
+g <- replicate_df(g, "year", unique(d$year))
+```
+
+
+```{r}
+lu <- select(d, year, survey_abbrev) |> distinct()
+lu <- filter(lu, year != 2021) |> bind_rows(tibble(year = 2021, survey_abbrev = "Both")) |> arrange(year)
+
+p <- predict(fit, newdata = g, return_tmb_object = TRUE)
+ind <- get_index(p)
+
+left_join(ind, lu) |> 
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev))+
+  geom_pointrange()
+```
+
+```{r}
+fit_tv <- sdmTMB(density_ppkm2 ~ 0, data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE, spatiotemporal = "iid", time_varying = ~ 1, time_varying_type = "rw", spatial = "on", extra_time = c(2006, 2017, 2020), silent = FALSE)
+sanity(fit_tv)
+```
+
+```{r}
+p_tv <- predict(fit_tv, newdata = g, return_tmb_object = TRUE)
+ind_tv <- get_index(p_tv)
+
+left_join(ind_tv, lu) |> 
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev))+
+  geom_pointrange()
+```
+
+```{r}
+fit_rw <- sdmTMB(density_ppkm2 ~ 1, data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE, spatiotemporal = "rw", spatial = "on", extra_time = c(2006, 2017, 2020), silent = FALSE)
+```
+
+
+```{r}
+fit_rw
+```
+
+```{r}
+p_rw <- predict(fit_rw, newdata = g, return_tmb_object = TRUE)
+ind_rw <- get_index(p_rw)
+
+left_join(ind_rw, lu) |> 
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev))+
+  geom_pointrange()
+```
+
+```{r}
+AIC(fit_rw, fit_tv, fit)
+```
+
+```{r}
+bind_rows(
+  mutate(ind_rw, model = "Random walk random field"),
+  mutate(ind_tv, model = "Time-varying random walk"),
+  mutate(ind, model = "IID fields")
+) |> 
+  left_join(lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev))+
+  geom_pointrange() +
+  facet_wrap(~model) +
+  scale_colour_brewer(palette = "Set2")
+```
+
+```{r}
+set.seed(42)
+d$sim_density_ppkm2 <- simulate(fit_rw, nsim = 1, type = "mle-mvn")
+fit_sim <- sdmTMB(sim_density_ppkm2 ~ factor(year), data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE)
+
+p_sim <- predict(fit_sim, newdata = g, return_tmb_object = TRUE)
+ind_sim <- get_index(p_sim)
+
+left_join(ind_sim, lu) |> 
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev))+
+  geom_pointrange()
+```
+
+```{r}
+simulate(fit_rw, 200, type =  "mle-mvn") |> dharma_residuals(fit_rw)
+simulate(fit_tv, 200, type =  "mle-mvn") |> dharma_residuals(fit_tv)
+simulate(fit, 200, type =  "mle-mvn") |> dharma_residuals(fit)
+```
+
+```{r}
+library(future)
+plan(multisession)
+
+cv_iid <- sdmTMB_cv(
+  density_ppkm2 ~ 0, 
+  data = d, 
+  mesh = mesh, 
+  time = "year", family = tweedie(), 
+  anisotropy = TRUE, 
+  extra_time = all_yrs, 
+  spatiotemporal = "iid", 
+  spatial = "on", 
+  time_varying = ~ 1, 
+  lfo = TRUE, 
+  lfo_forecast = 1, 
+  lfo_validations = 7, 
+  control = sdmTMBcontrol(start = list(ln_tau_V = matrix(20, 1, 1)), map = list(ln_tau_V = factor(NA)))
+)
+
+cv_rw <- sdmTMB_cv(density_ppkm2 ~ 1, data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE, extra_time = all_yrs, spatiotemporal = "rw", lfo = TRUE, lfo_forecast = 1, lfo_validations = 7)
+
+cv_tv <- sdmTMB_cv(density_ppkm2 ~ 0, data = d, mesh = mesh, time = "year", family = tweedie(), anisotropy = TRUE, extra_time = all_yrs, spatiotemporal = "iid", time_varying = ~ 1, lfo = TRUE, lfo_forecast = 1, lfo_validations = 7)
+
+cv_iid$sum_loglik
+cv_rw$sum_loglik
+cv_tv$sum_loglik
+```
+
+# Rules
+
+- This is hard and we don't have great answers
+- AIC and residuals alone aren't going to save you
+- Be creative with visualizations
+- *Penalize time as little as possible*
+- Try to think of creative ways to use cross validation
+- Random walk random fields will also "work" but can over penalize time
+- If you really have to simulation testing can help answer thorny questions
