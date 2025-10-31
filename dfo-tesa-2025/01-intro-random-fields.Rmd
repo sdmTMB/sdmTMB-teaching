@@ -37,24 +37,21 @@ library(mgcv)
 
 ---
 
-# Plan for the 4-day course
+# Plan for the 3-day course
 
 * Day 1: Intro to random fields, intro to sdmTMB, spatial models
 
-* Day 2: Spatiotemporal models
+* Day 2: Spatiotemporal models, families, delta models, time-varying effects, spatially varying effects, index standardization
 
-* Day 3: Time-varying effects, spatially varying effects, index standardization
-
-* Day 4: Extrapolation and forecasting, touch on other advanced topics (e.g., correlation barriers, presence-only data, priors)
-
+* Day 3: Integrated models, forecasting, simulating, multivariate extensions, touch on other advanced topics (correlation barriers, presence-only data, priors)
 
 ---
 
-# Plan for the 4-day course
+# Plan for the 3-day course
 
-* Each day: about 1-1:15 hours of lectures, 5 minute break, ~50 minutes of exercises, ~15 minute regroup
+* Each day: a mix of lectures and exercises, breaks as needed, two hour-long speed-talk sessions
 
-* Have questions? Use the [Google Doc](https://docs.google.com/document/d/1JScvWtNWrJUfMrUvDZMzWhTUXqsLZSyiN2ULZdaihZk/edit?usp=sharing), ask during any pause, or at the end of each day. Thanks!
+* Have questions? Use the [Google Doc](TODO) or ask any time. Thanks!
 
 ---
 
@@ -134,18 +131,17 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 
 ---
 
-# Modeling spatial autocorrelation
+# Modeling latent spatial variables
 
-* Need 'wiggly'/smooth surface for approximating all spatial variables missing from model ('latent' variables)
+* Need a "wiggly" surface to approximate unobserved spatially structured covariates
+* Options include:
+  * 2D smoothers with GAMs (e.g., `mgcv`)
+  * Gaussian random fields
+  * Other machine-learning approaches (e.g., random forests)
 
-* Several approaches exist
-  * 2D smooths in mgcv
-  * Random fields and the Stochastic Partial Differential Equation (SPDE)
-
-* SPDE differs in that it explicitly estimates meaningful parameters for spatial covariance function
-
-.xsmall[
-Miller, D.L., Glennie, R. & Seaton, A.E. Understanding the Stochastic Partial Differential Equation Approach to Smoothing. JABES 25, 1–16 (2020)
+.tiny[
+Miller, D.L., Glennie, R., and Seaton, A.E. 2019. JABES.  
+Stock, B.C. et al. 2019. Can. J. Fish. Aquat. Sci.
 ]
 
 ---
