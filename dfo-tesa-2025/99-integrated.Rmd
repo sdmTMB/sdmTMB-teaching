@@ -1,0 +1,302 @@
+---
+title: "Data integration"
+subtitle: "DFO TESA sdmTMB workshop"
+author: ""
+institute: ""
+date: "November 4--6 2025"
+output:
+  xaringan::moon_reader:
+    css: ["xaringan-themer.css", "theme.css"]
+    lib_dir: libs
+    nature:
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+<!-- Build with: xaringan::inf_mr() -->
+
+```{r preamble, include=FALSE, cache=FALSE}
+source(here::here("dfo-tesa-2025/preamble.R"))
+do.call(knitr::opts_chunk$set, knitr_opts)
+```
+
+```{r libs, include=FALSE}
+library(dplyr)
+library(sdmTMB)
+library(ggplot2)
+library(mgcv)
+```
+
+# Data integration
+
+Employing multiple data sources in the same population, stock assessment, or species distribution model.
+
+--
+
+Also known as "data fusion" or "integrated analysis".
+
+--
+
+Different data sources could be 
+.small[
+- multiple surveys of the same kind
+- surveys with different gear
+- commercial CPUE
+- different data "types" (e.g., presence-absence with count data)
+]
+
+.tiny[
+[Grüss et al. (2025) Fisheries Research](https://doi.org/10.1016/j.fishres.2025.107321)
+]
+
+---
+
+# Types of data integration
+
+Spatial domain: same domain vs. "expanded domain"
+
+Catchability: equal, constant difference, spatially varying
+
+Any combination of these!
+
+With (or sometimes without) comparative fishing
+
+.tiny[
+[Grüss et al. (2025) Fisheries Research](https://doi.org/10.1016/j.fishres.2025.107321)
+]
+
+---
+
+# Expanded domain
+
+Examples:
+
+Two surveys or more bienniel surveys run by one agency together covering a coastline (e.g., BC groundfish surveys)
+
+Two or more surveys run by neighbouring agencies with somewhat different gear but enough spatiotemporal proximity
+
+---
+
+# Expanded domain example
+
+.small[BC groundfish surveys: same gear, bienniel sampling design (don't do this!)]
+
+.center[
+<img src="images/bc-gf-maps.png" width="700px"/>
+]
+
+.tiny[[Anderson et al. annual Pacific groundfish synopsis reports](https://github.com/pbs-assess/gfsynopsis)]
+
+---
+
+# Expanded domain example
+
+.small[BC groundfish surveys: same gear, bienniel sampling design]
+
+.center[
+<img src="images/bc-index-gfs.png" width="400px"/>
+]
+
+.tiny[[Anderson et al. annual Pacific groundfish synopsis reports](https://github.com/pbs-assess/gfsynopsis)]
+
+---
+
+# Expanded domain example
+
+.small[Northeast Pacific Ocean Pacific Spiny Dogfish:<br>NOAA + DFO trawl surveys]
+
+.center[
+<img src="images/dogfish-map.png" width="430px"/>
+]
+
+.tiny[[Davidson et al. 2025. In press at Fish and Fisheries](https://doi.org/10.32942/X2V64Z)]
+
+---
+
+class: center, middle, inverse
+
+# Why data integration?
+
+---
+
+# Why data integration?
+
+.small[
+Model a species over a larger range (e.g., for transboundry distribution shift metrics, better estimates of environmental covariates of distribution)
+]
+
+.small[
+Can make use of available data with often more accurate and precise distribution predictions
+]
+
+.small[
+For single synthetic population indices:
+- Assessment models aren't usually equipped to combine spatial data
+- Often statistically convenient
+- Sometimes necessary when designing management procedures
+- Fish Stocks provisions "one stock, one LRP" guidance
+]
+
+---
+
+class: center, middle, inverse
+
+# How do we do data integration?
+
+---
+
+# Regression discontinuity design (RDD)
+
+The ability to integrate data, especially in an expanded domain context depends on the concept of regression discontinuity design.
+
+```{r, out.width="70%"}
+library(ggplot2)
+library(dplyr)
+set.seed(123)
+n <- 200
+running <- seq(1400, 2800, length.out = n)
+cutoff <- 2000
+treatment <- ifelse(running >= cutoff, 1, 0)
+
+# Simulate outcomes with different intercepts/slopes on each side
+outcome <- 1000 + 0.9 * running + 300 * treatment + rnorm(n, 0, 100)
+
+# Combine into a data frame
+df <- data.frame(running, outcome, treatment = factor(treatment))
+
+# Fit regressions on each side of the cutoff
+fit0 <- lm(outcome ~ running, data = df[df$running < cutoff, ])
+fit1 <- lm(outcome ~ running, data = df[df$running >= cutoff, ])
+
+# Predict fitted lines for plotting
+pred0 <- data.frame(running = seq(min(df$running), cutoff, length.out = 100))
+pred1 <- data.frame(running = seq(cutoff, max(df$running), length.out = 100))
+pred0$fit <- predict(fit0, newdata = pred0)
+pred1$fit <- predict(fit1, newdata = pred1)
+
+# Plot
+ggplot(df, aes(x = running, y = outcome, color = treatment)) +
+  geom_point(alpha = 0.8) +
+  geom_line(data = pred0, aes(y = fit), color = "black") +
+  geom_line(data = pred1, aes(y = fit), color = "black") +
+  geom_vline(xintercept = cutoff, color = "red") +
+  labs(
+    x = "Covariate value",
+    y = "Outcome"
+  ) +
+  scale_color_manual(values = c("steelblue", "orange")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+---
+
+# Ways of accounting for catchability
+
+Constant catchability coefficient
+
+```{r, eval=FALSE, echo=TRUE}
+formula = catch ~ factor(year) + 
+  factor(gear) #<<
+```
+
+Spatially varying catchability coefficient
+
+```{r, eval=FALSE, echo=TRUE}
+formula = catch ~ factor(year) + 
+  factor(gear), #<<
+spatial_varying = ~ factor(gear) #<<
+```
+
+Mind what your base gear factor level is
+
+---
+
+# Different likelihoods
+
+Data integration can be with the same or different likelihoods.
+
+**Same**: two surveys that collect catch weight (e.g., delta-Gamma or Tweedie)
+
+**Different**: catch count (Poisson) + presence-absence (Bernoulli with clogog link)
+
+---
+
+# Combining all continuous positive, count, and 0-1 data (advanced!)
+
+.small[
+There's an underlying surface of fish population intensity. You observe it as one of:<br>- weight, count, presence/absence
+]
+
+.small[
+Internally, share linear predictors, convert into different observation likelihoods.
+]
+
+--
+
+.small[
+Key concepts:
+- a cloglog linked Bernoulli can be thought of as a "thinned" observation of a count process
+- a Poisson-link delta model has an underlying "count" model and a weight per "count"
+]
+
+---
+
+class: center, middle, inverse
+
+# Food for thought on data integration
+
+---
+
+# Deciding whether you should combine data
+
+.small[
+Do they represent the same population?
+]
+
+--
+
+.small[
+Are the selectivities similar enough, if you're not controlling for that?
+]
+
+--
+
+.small[
+Do they give a similar impression on their own?
+]
+
+--
+
+.small[
+Does it help or hinder your stock assessment to create a synthetic index?
+]
+
+--
+
+.small[
+Does a secondary data source substantially change parameter estimates from those of the trusted data source? ([Rufener et al. 2021 Ecol. Appl.](https://onlinelibrary.wiley.com/doi/abs/10.1002/eap.2453)).
+]
+
+---
+
+# Caveats
+
+Unless fish length interacts with catchability, you're assuming matching length selectivity
+
+--
+
+Expanded domain models can go awry in practice!
+
+--
+
+There may be good reasons to not integrate two datasets
+
+--
+
+This is pretty new in the fisheries world
+
+--
+
+Using different likelihoods per row of data isn't merged into the main branch of sdmTMB yet, but should be soon. It's possible in tinyVAST.
+
