@@ -1,0 +1,147 @@
+---
+title: "Residuals in sdmTMB"
+format: html
+editor: visual
+---
+
+# Goals:
+
+-   Experiment with the different kinds of residuals in sdmTMB
+-   Gain experience with the different kinds of plots we can make with residuals
+
+```{r}
+#| echo=FALSE
+library(sdmTMB)
+```
+
+# The simulated data
+
+We will simulate some negative binomial data with an intercept and slope and a spatial random field:
+
+```{r}
+set.seed(1)
+predictor_dat <- data.frame(X = runif(1000), Y = runif(1000), a1 = rnorm(1000))
+mesh <- make_mesh(predictor_dat, xy_cols = c("X", "Y"), cutoff = 0.1)
+dat <- sdmTMB_simulate(
+  formula = ~ 1 + a1,
+  data = predictor_dat,
+  mesh = mesh,
+  family = nbinom2(link = "log"),
+  phi = 0.4,
+  range = 0.4,
+  sigma_O = 0.4,
+  seed = 1,
+  B = c(0.2, 0.8) # B0 = intercept, B1 = a1 slope
+)
+```
+
+# Fitting models
+
+Then we will fit three models:
+
+1.  A Poisson spatial GLM with a covariate
+2.  A negative binomial spatial GLM with a covariate
+3.  A negative binomial spatial GLM that is missing a covariate
+
+```{r}
+fit_pois <- sdmTMB(observed ~ a1, data = dat, family = poisson(), mesh = mesh)
+fit_nb2 <- update(fit_pois, family = nbinom2())
+fit_nb2_miss <- update(fit_nb2, formula. = observed ~ 1)
+```
+
+# Theoretical randomized quantile residuals
+
+First lets generate residuals for the Poisson GLM:
+
+```{r}
+set.seed(123)
+rq_res <- residuals(fit_pois, type = "mle-mvn")
+rq_res <- rq_res[is.finite(rq_res)] # some Inf
+qqnorm(rq_res);abline(0, 1)
+```
+
+### Exercise:
+
+1.  How do this look?
+2.  Why do they look the way that they do?
+
+Now let's generate residuals for the negative binomial GLM:
+
+```{r}
+set.seed(123)
+rq_res <- residuals(fit_nb2, type = "mle-mvn")
+qqnorm(rq_res);abline(0, 1)
+```
+
+### Exercise:
+
+1.  How do this look?
+2.  Does this look good enough?
+
+# Simulation based randomized quantal residuals
+
+Let's simulate from our models:
+
+```{r}
+s_pois <- simulate(fit_pois, nsim = 200, type = "mle-mvn")
+s_nb2 <- simulate(fit_nb2, nsim = 200, type = "mle-mvn")
+s_nb2_miss <- simulate(fit_nb2_miss, nsim = 200, type = "mle-mvn")
+```
+
+Note that we used `type = "mle-mvn"` here!
+
+We can look at DHARMa simulation-based residuals on QQ plots like this:
+
+```{r}
+dharma_residuals(s_pois, fit_pois)
+dharma_residuals(s_nb2, fit_nb2)
+```
+
+We can also return the DHARMa object to work with the various DHARMa functions.
+
+```{r}
+r_pois <- dharma_residuals(s_pois, fit_pois, return_DHARMa = TRUE)
+r_nb2 <- dharma_residuals(s_nb2, fit_nb2, return_DHARMa = TRUE)
+```
+
+```{r}
+plot(r_pois)
+plot(r_nb2)
+```
+
+```{r}
+DHARMa::testResiduals(r_nb2)
+```
+
+### Exercise:
+
+1.  What are we looking at in these panels?
+
+We can test for spatial autocorrelation:
+
+```{r}
+DHARMa::testSpatialAutocorrelation(r_nb2, x = dat$X, y = dat$Y)
+```
+
+Or zero inflation:
+
+```{r}
+DHARMa::testZeroInflation(r_pois)
+DHARMa::testZeroInflation(r_nb2)
+```
+
+Or for a missing covariate:
+
+```{r}
+s_nb2_miss <- simulate(fit_nb2_miss, nsim = 200, type = "mle-mvn")
+r_nb2_miss <- dharma_residuals(s_nb2_miss, fit_nb2_miss, return_DHARMa = TRUE)
+DHARMa::plotResiduals(r_nb2_miss, form = dat$a1)
+
+# against a random variable for comparison:
+set.seed(1)
+DHARMa::plotResiduals(r_nb2_miss, form = rnorm(length(dat$a1)))
+```
+
+### Exercise:
+
+1.  What are we looking at here and what does it mean?
