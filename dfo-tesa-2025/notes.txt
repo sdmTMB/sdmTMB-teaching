@@ -1,3 +1,16 @@
+- extra stuff to add in:
+- residuals
+- simulation
+- integration
+- stitching
+
+
+- dropping (but could include)
+- barriers
+- priors
+- presence only
+
+
 # Topics to make sure we hit based on feedback:
 
 * Use with fisheries dependent data. Can we? With what caveats?
@@ -48,6 +61,9 @@
 - [ ] New slides in spatiotemporal lectures motivating spatiotemporal fields
 - [ ] Tweak the 03-exercise to also try time-varying effects and spatially varying effects
 - [ ] Deviance explained in exercises - with Tweedie or NB2
+- [x] New slides on residuals
+- [x] New slides on integrated models
+- [x] New exercises on integrated models
 
 # Old plan for the 4-day course
 
