@@ -143,28 +143,113 @@ qnorm(u)
 
 where the `runif()` adds randomization.
 
+.tiny[
+See the [residuals vignette](https://pbs-assess.github.io/sdmTMB/articles/residual-checking.html) that expands on this.]
+
 ---
 
 # Decisions within the type of residuals
 
-- How do we treat the fixed and random effects?
+1. How do we treat the fixed and random effects?
 
-- Do we use theoretical or simulation-based quantiles
+--
+
+2. Do we use theoretical or simulation-based quantiles
 
 ---
 
 # Fixed and random effects
 
-- *Many* options, useful ones to consider:
+*Many* options, useful ones to consider:
 
-- Hold fixed effects at their maximum likelihood estimates (MLEs)
+Hold fixed effects at their maximum likelihood estimates (MLEs)
 
-- Set random effects to one of:
-  - Empirical Bayes estimates
-  - One sample drawn from their precision matrix*
-  - One sample drawn from an MCMC chain
-  
-*Usually, I would suggest using this
+Set random effects to one of:
+  - Empirical Bayes estimates *(weird)*
+  - One sample drawn from their precision matrix *(good enough, fast)*
+  - One sample drawn from an MCMC chain *(great, slow)*
+
+---
+
+# An aside on empirical Bayes
+
+.small[
+What the heck is an empirical Bayes (EB) random effect!?
+]
+
+--
+
+.small[
+Find fixed effects that maximize the marginal log likelihood.
+]
+
+--
+
+.small[
+Hold the fixed effects at these MLEs.
+]
+
+--
+
+.small[
+Now use an optimizer to find the random effects that maximize the likelihood.
+]
+
+--
+
+.small[
+These are what you're used to getting out of lme4, mgcv, glmmTMB, sdmTMB, etc.!
+]
+
+.small[
+Key concept: EB estimates are pulled towards the observations and are not expected to reflect a draw from the random effect distribution (which is assumed MVN here).
+]
+
+---
+
+# MLE-EB residuals gone wrong
+
+```{r}
+set.seed(123)
+predictor_dat <- data.frame(
+  X = runif(1000), Y = runif(1000),
+  year = rep(1:5, each = 200)
+)
+mesh <- make_mesh(predictor_dat, xy_cols = c("X", "Y"), cutoff = 0.1)
+sim_dat <- sdmTMB_simulate(
+  formula = ~ 1,
+  data = predictor_dat,
+  time = "year",
+  mesh = mesh,
+  family = gaussian(),
+  range = 0.3,
+  sigma_E = 0.3,
+  phi = 0.1,
+  sigma_O = 0.4,
+  seed = 1,
+  B = 0.2 # intercept
+)
+fit <- sdmTMB(observed ~ 1, data = sim_dat, time = "year", mesh = mesh)
+set.seed(1)
+```
+
+```{r, echo=TRUE}
+r1 <- residuals(fit, type = "mle-eb")
+qqnorm(r1);abline(0, 1)
+```
+
+---
+
+# MLE-MVN residuals gone right
+
+```{r}
+set.seed(1)
+```
+
+```{r, echo=TRUE}
+r2 <- residuals(fit, type = "mle-mvn")
+qqnorm(r2);abline(0, 1)
+```
 
 ---
 
@@ -174,6 +259,8 @@ Do we answer the question "Where does each observed value fall in its predicted 
 
 1. Using the theoretical CDF function, e.g., `pnorm()`, `pgamma()`, or
 
+--
+
 2. Simulating each observation many times and calculating the proportion of times our simulated values are $\le$ the observation.
 
 ---
@@ -181,15 +268,24 @@ Do we answer the question "Where does each observed value fall in its predicted 
 # Theoretical vs. simulation-based residual tradeoffs
 
 - In sdmTMB, the theoretical RQRs are N(0, 1)
+
+--
+
 - In DHARMa, the simulation-based RQRs are U(0, 1)
 
+--
+
 - We haven't worked out the theoretical RQRs for all distributions or for delta models
+
+--
 
 - Simulation-based RQRs are stochastic (so set a seed and take enough draws)
 
 ---
 
 # Normal(0, 1) vs. Uniform(0, 1)
+
+Residuals from a perfectly matched model:
 
 ```{r, echo=FALSE, eval=TRUE}
 par(mfrow = c(1, 2))
@@ -280,9 +376,11 @@ DHARMa::testOverdispersion(dharma)
 
 Check for spatial correlation:
 
+.xsmall[
 ```{r, echo=TRUE, out.width="65%", results='hide'}
 DHARMa::testSpatialAutocorrelation(dharma, x = dat$X, y = dat$Y)
 ```
+]
 
 ---
 
@@ -298,7 +396,7 @@ DHARMa::plotResiduals(dharma, form = dat$a1)
 
 # Overall messages
 
-- Look at residuals
+- Look at residuals and model simulation output
 
 --
 
@@ -318,5 +416,5 @@ DHARMa::plotResiduals(dharma, form = dat$a1)
 
 --
 
-- Simulation-based residuals can work for any model
+- Simulation-based residuals are available for all models in sdmTMB
 
