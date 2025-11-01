@@ -191,7 +191,7 @@ fit_sim <- sdmTMB(y_sim ~ ..., data = new)
 
 p <- predict(fit_sim, ...)
 
-get_index(p)
+get_index(p)1
 
 # compare against known truth
 # (simulate on your survey grid) and repeat

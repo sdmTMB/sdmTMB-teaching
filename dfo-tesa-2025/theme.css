@@ -87,3 +87,20 @@
 .blue .remark-inline-code {
   color: #1e81b0 !important;
 }
+
+/* Title slide adjustments */
+.remark-slide-content.title-slide {
+  vertical-align: top !important;
+  padding-top: 60px !important;
+}
+
+.remark-slide-content.title-slide h1 {
+  margin-top: 30 !important;
+  margin-bottom: 20px !important;
+}
+
+.remark-slide-content.title-slide h2,
+.remark-slide-content.title-slide h3 {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
