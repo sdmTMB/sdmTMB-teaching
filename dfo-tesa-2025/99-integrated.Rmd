@@ -125,9 +125,13 @@ class: center, middle, inverse
 Model a species over a larger range (e.g., for transboundry distribution shift metrics, better estimates of environmental covariates of distribution)
 ]
 
+--
+
 .small[
 Can make use of available data with often more accurate and precise distribution predictions
 ]
+
+--
 
 .small[
 For single synthetic population indices:
@@ -216,16 +220,18 @@ Mind what your base gear factor level is
 
 Data integration can be with the same or different likelihoods.
 
+Examples:
+
 **Same**: two surveys that collect catch weight (e.g., delta-Gamma or Tweedie)
 
 **Different**: catch count (Poisson) + presence-absence (Bernoulli with clogog link)
 
 ---
 
-# Combining all continuous positive, count, and 0-1 data (advanced!)
+# Combining all continuous positive, count, and 0-1 data (😲)
 
 .small[
-There's an underlying surface of fish population intensity. You observe it as one of:<br>- weight, count, presence/absence
+Idea: there's an underlying surface of fish population intensity. You observe it as one of:<br>- weight, count, presence/absence
 ]
 
 .small[
@@ -257,25 +263,25 @@ Do they represent the same population?
 --
 
 .small[
-Are the selectivities similar enough, if you're not controlling for that?
+Are the selectivities similar enough, if you're not controlling for it?
 ]
 
 --
 
 .small[
-Do they give a similar impression on their own?
+Do the datasets give a similar impression on their own?
 ]
 
 --
 
 .small[
-Does it help or hinder your stock assessment to create a synthetic index?
+Does it help or hinder your stock assessment to create an integrated index?
 ]
 
 --
 
 .small[
-Does a secondary data source substantially change parameter estimates from those of the trusted data source? ([Rufener et al. 2021 Ecol. Appl.](https://onlinelibrary.wiley.com/doi/abs/10.1002/eap.2453)).
+Does a secondary data source substantially change parameter estimates from those of a trusted data source? ([Rufener et al. 2021 Ecol. Appl.](https://onlinelibrary.wiley.com/doi/abs/10.1002/eap.2453)).
 ]
 
 ---
