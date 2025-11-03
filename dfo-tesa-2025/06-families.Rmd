@@ -243,15 +243,3 @@ Positive components may be modeled as a mixture of 2 distributions
 * See `gamma_mix()` and `lognormal_mix()`
 
 * Can be delta model as `delta_gamma_mix()` and `delta_lognormal_mix()`
-
----
-
-# SDMs with presence-only data
-
-Infinitely Weighted Logistic Regression (IWLR)  
-* [Fithian & Hastie (2013)](https://doi.org/10.1214/13-AOAS667)  
-
-Downweighted Poisson Regression (DWPR)  
-* [Renner et al. 2015](https://doi.org/10.1111/2041-210X.12352) 
-
-Code examples with sdmTMB [here](https://github.com/pbs-assess/sdmTMB/blob/main/scratch/julia-vignettes/presence_absence.Rmd)

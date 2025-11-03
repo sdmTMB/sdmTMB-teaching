@@ -248,9 +248,15 @@ class: center, middle, inverse
 
 * Deviance explained measures how much of the variation in the data is captured by the model compared to a null (usually intercept-only) model
 
+--
+
 * Analogous to an R² for models fit with likelihood methods (e.g., GLMs, GAMs, or GLMMs)
 
+--
+
 * Calculated as `1 − (model deviance / null deviance)`; higher values indicate a better fit
+
+--
 
 * Can also be used to compare % increase in deviance explained between two models fit to the same data
 

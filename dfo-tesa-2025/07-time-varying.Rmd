@@ -75,21 +75,26 @@ the `formula` argument** (this includes the intercept)
 
 # Time-varying intercept
 
-Note: a `0` or `-1` in formula for suppressing global intercept
-
-Otherwise, both the main effects and time-varying effects would have the same parameter and this can't be estimated.
-
 .small[
 ```{r tv-int, echo = TRUE}
 mesh <- make_mesh(pcod, xy_cols = c("X", "Y"), cutoff = 10)
 fit <- sdmTMB(
   density ~ 0 + s(depth, k = 5), 
   time_varying = ~ 1, #<<
+  time_varying_type = "rw", #<<
   data = pcod, mesh = mesh,
   time = "year",  
   family = tweedie(link = "log")
 )
 ```
+]
+
+.xsmall[
+Note: a `0` or `-1` in formula for suppressing global intercept in this case
+
+`time_varying_type = "rw"` (default) estimates the first time step as independent
+
+Also `"ar1"` or `"rw0"`
 ]
 
 ---
@@ -126,15 +131,10 @@ print(fit)
 
 # Getting coefficients 
 
-Or by digging into `fit$sd_report`
-
-(Not yet in `tidy.sdmTMB()`.)
+Or via `tidy()`:
 
 ```{r b-rw-est, echo=TRUE}
-library(TMB)
-est <- as.list(fit$sd_report, "Est")
-est_se <- as.list(fit$sd_report, "Std. Error")
-cbind(est$b_rw_t, est_se$b_rw_t)
+tidy(fit, "ran_vals")
 ```
 
 ---
