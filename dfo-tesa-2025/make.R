@@ -83,6 +83,19 @@ if (!PARALLEL) {
   }
 }
 
+# Remove _cache folders after building
+cache_folders <- list.files(
+  here::here(folder),
+  pattern = "_cache$",
+  full.names = TRUE,
+  recursive = TRUE,
+  include.dirs = TRUE
+)
+purrr::walk(cache_folders, function(.x) {
+  cat("Removing cache folder:", .x, "\n")
+  rm_folder(.x)
+})
+
 # Remove .rmarkdown files from exercises folder
 rmarkdown_files <- list.files(
   file.path(here::here(folder, "exercises")),

@@ -1,4 +1,4 @@
-f_ans <- readLines("dfo-tesa-2023/exercises/04-exercise-answers.qmd")
+f_ans <- readLines("dfo-tesa-2025/exercises/05-exercise-troubleshooting-answers.qmd")
 
 f <- f_ans[!grepl("# answer$", f_ans)]
 
@@ -9,4 +9,4 @@ for (i in seq_along(f)) {
   }
 }
 
-writeLines(f, "dfo-tesa-2023/exercises/04-exercise.qmd")
+writeLines(f, "dfo-tesa-2025/exercises/05-exercise-troubleshooting.qmd")
