@@ -27,7 +27,10 @@ If you get a warning like this:
 ```
 TMB was built with Matrix version 1.5.3
 Current Matrix version is 1.5.1
-Please re-install 'TMB' from source using install.packages('TMB', type = 'source') or ask CRAN for a binary version of 'TMB' matching CRAN's 'Matrix' package
+Please re-install 'TMB' from source using
+install.packages('TMB', type = 'source') or ask
+CRAN for a binary version of 'TMB' matching CRAN's
+'Matrix' package
 ```
 
 You can safely ignore it (if you want to squash the warning, you can
@@ -85,9 +88,11 @@ install.packages(pkgs)
 
 ## Optionally installing the development version of sdmTMB
 
-This is completely optional. If this is confusing or doesn't work, don't worry---the CRAN version is just fine!
+This is completely optional. If this is confusing or doesn't work,
+don't worry---the CRAN version is just fine!
 
-This requires a C++ compiler or the Rtools application on Windows. Install Rtools 4.5 from the Software Center.
+This requires a C++ compiler or the Rtools application on Windows.
+Install Rtools 4.5 from the Software Center.
 
 ```{r, eval=FALSE}
 pak::pak("pbs-assess/sdmTMB", dependencies = TRUE)
