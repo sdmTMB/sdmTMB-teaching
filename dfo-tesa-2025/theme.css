@@ -104,3 +104,13 @@
   margin-top: 10px !important;
   margin-bottom: 10px !important;
 }
+
+div.footer {
+    content: "";
+    position: absolute;
+    bottom: 25px;
+    right: 10px;
+    height: 40px;
+    width: 400px;
+    font-size: .6em;
+}

@@ -1,5 +1,5 @@
 ---
-title: "Introduction to random fields"
+title: "Introduction to the course, random fields, and the SPDE"
 subtitle: "DFO TESA sdmTMB workshop"
 author: ""
 institute: ""
@@ -29,40 +29,52 @@ library(mgcv)
 
 # Who we are
 
-<img src="images/intro_slide.png" width="650px" class="center" />
-<!-- * Eric Ward, Northwest Fisheries Science Center (Seattle) -->
-<!-- * Sean Anderson, Fisheries and Oceans Canada (Nanaimo) -->
-<!-- * Lewis Barnett, Alaska Fisheries Science Center (Seattle)  -->
-<!-- * Philina English, Fisheries and Oceans Canada (Nanaimo) -->
+<img src="images/intro_slide.jpg" width="800px" class="center" />
+
+---
+
+# Who you are
+
+1. Name
+
+2. What you work on
+
+3. Experience level with sdmTMB or related VAST/INLA models
+
+4. Anything in particular you hope to get out of the course
 
 ---
 
 # Plan for the 3-day course
 
-* Day 1: Intro to random fields, intro to sdmTMB, spatial models
+Day 1: Intro to random fields, intro to sdmTMB, spatial models, spatiotemporal models, model comparison/validation, residuals
 
-* Day 2: Spatiotemporal models, families, delta models, time-varying effects, spatially varying effects, index standardization
+--
 
-* Day 3: Integrated models, forecasting, simulating, multivariate extensions, touch on other advanced topics (correlation barriers, presence-only data, priors)
+Day 2: Families, delta models, time-varying effects, spatially varying effects, index standardization, speed talks
+
+--
+
+Day 3: Integrated models, forecasting, simulating, touch on other advanced topics (correlation barriers, presence-only data, priors), speed talks, Q/A and advice
 
 ---
 
-# Plan for the 3-day course
+# Plan for the course
 
-* Each day: a mix of lectures and exercises, breaks as needed, two hour-long speed-talk sessions
+Each day: a mix of lectures and exercises, breaks as needed, two hour-long speed-talk sessions
 
-* Have questions? Use the [Google Doc](TODO) or ask any time. Thanks!
+Have questions? Please ask any time or in the [Google Doc](https://docs.google.com/document/d/1tCldIs2B9-AeCZM-6ss8Qhn2MSw4wtxKuXkjoRzgneg/edit?tab=t.0). Thanks!
 
 ---
 
 # Motivating questions
 
-* Data often have spatial attributes
+Data often have spatial attributes
 
-* Ideal world:
-  * Plug spatial covariates into a GLM / GLMM
-  * Residuals are uncorrelated  
-  
+Ideal world:
+  1. Plug spatial covariates into a GLM / GLMM
+  2. Residuals are uncorrelated
+
 ```{r sim-rf-intro, echo=FALSE, fig.asp=0.4}
 set.seed(123)
 predictor_dat <- data.frame(
@@ -96,8 +108,12 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 ---
 
 # Reality
-  
-* Residual spatial autocorrelation
+
+Residual spatial autocorrelation is pervasive.
+
+--
+
+Alternatively, there are unmodelled, missing, or "latent" spatially structured variables.
 
 ```{r sim-rf-intro-cor, echo=FALSE, fig.asp=0.4}
 set.seed(123)
@@ -124,7 +140,7 @@ sim_dat <- sdmTMB_simulate(
 )
 
 ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(alpha=0.7, size=3) + 
+  geom_point(alpha=0.7, size=3) +
   guides(col=guide_legend(title="Residuals")) +
   scale_color_gradient2()
 ```
@@ -133,137 +149,76 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 
 # Modeling latent spatial variables
 
-* Need a "wiggly" surface to approximate unobserved spatially structured covariates
-* Options include:
-  * 2D smoothers with GAMs (e.g., `mgcv`)
+Need a 'wiggly' surface for approximating all missing spatially structured variables
+
+--
+
+Several approaches exist. For example:
+  * 2D smoothers with GAMs (e.g., mgcv)
   * Gaussian random fields
-  * Other machine-learning approaches (e.g., random forests)
+  * Random forests etc.
 
 .tiny[
-Miller, D.L., Glennie, R., and Seaton, A.E. 2019. JABES.  
-Stock, B.C. et al. 2019. Can. J. Fish. Aquat. Sci.
+Miller, D.L., Glennie, R., and Seaton, A.E. 2019. Understanding the Stochastic Partial Differential Equation approach to smoothing. JABES.
+
+Stock, B.C., Ward, E.J., Eguchi, T., Jannot, J.E., Thorson, J.T., Feist, B.E., and Semmens, B.X. 2019. Comparing predictions of fisheries bycatch using multiple spatiotemporal species distribution model frameworks. CJFAS.
 ]
 
 ---
 
-# Matérn covariance
+# Why focus on Gaussian random fields?
 
-Flexible, can be exponential or Gaussian shape
+Random fields are nice because
 
-```{r matern-plot}
-x <- seq(from = 0, to = 1, length.out = 100)
-df <- data.frame(
-  x = rep(x, 4),
-  "nu" = sort(rep(c(0.5, 1.5, 2.5, 10), 100))
-)
-df$row <- seq(1, nrow(df))
-df <- dplyr::group_by(df, row) %>%
-  dplyr::mutate(
-    cov =
-      rSPDE::matern.covariance(h = x, kappa = 5, nu = nu, sigma = 1)
-  )
-df$nu <- as.factor(df$nu)
-# TODO INLA is fixed at...
-ggplot(df, aes(x, cov, col = nu, group = nu)) +
-  geom_line(size = 1.3, alpha = 0.8) +
-  theme_bw() +
-  xlab("Distance") +
-  ylab("Covariance") +
-  ggtitle("Matérn covariance") +
-  guides(col = guide_legend(title = expression(nu))) +
-  theme(text = element_text(size = 21)) +
-  coord_cartesian(expand = FALSE)
-```
+--
 
----
+1. They are very flexible in the shapes they can fit
 
-# Predictive process models 
+--
 
-* Estimate spatial field as random effects 
+2. They can be fit efficiently
 
-* High dimensional datasets computationally challenging
+--
 
-* Gaussian process predictive process models:
-  * Estimate values at a subset of locations in the time series
-  *   'knots', 'vertices', or 'control points'
-  * Use covariance function to interpolate from knots to locations of observations
-
----
-
-# Predictive process models 
-
-* More knots (vertical dashed lines) = more wiggliness & parameters to estimate
-
-```{r show-gp, fig.height=4}
-x <- seq(1, 50)
-d <- as.matrix(dist(x, diag = TRUE))
-set.seed(123)
-df <- data.frame(
-  x = x,
-  true = c(spam::rmvnorm(1, mu = 0, Sigma = 1 * exp(-0.05 * d)))
-)
-df$y <- rnorm(df$true, df$true, 0.1)
-
-f1 <- mgcv::gam(y ~ s(x, k = 25, bs = "bs"), data = df)
-
-knots <- data.frame("x" = f1$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
-g1 <- ggplot(df, aes(x, y)) +
-  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
-  geom_point(col = "red", alpha = 0.7) +
-  theme(panel.grid = element_blank()) +
-  xlab("") +
-  ylab("Observations") +
-  geom_smooth(
-    method = "gam",
-    formula = y ~ s(x, bs = "bs", k = 25)
-  ) +
-  coord_cartesian(xlim = c(0, 50))
-
-f2 <- mgcv::gam(y ~ s(x, k = 7, bs = "bs"), data = df)
-knots <- data.frame("x" = f2$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
-
-g2 <- ggplot(df, aes(x, y)) +
-  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
-  geom_point(col = "red", alpha = 0.7) +
-  theme(panel.grid = element_blank()) +
-  xlab("") +
-  ylab("Observations") +
-  geom_smooth(method = "gam", formula = y ~ s(x, bs = "gp", k = 7)) +
-  coord_cartesian(xlim = c(0, 50))
-gridExtra::grid.arrange(g1, g2, ncol = 1)
-```
+3. They estimate ecologically interpretable parameters
 
 ---
 
 # Spatial data types
 
-* Lattice: gridded data, e.g. interpolated SST from satellite observations 
+### Areal/Lattice
+
+Values are observed on a grid or set of subregion polygons (e.g., interpolated SST from satellite observations, commercial catch records by state/county).
 
 --
 
-* Areal: data collected in neighboring spatial areas, e.g. commercial catch records by state / county
+### Point Process
 
---
+Observations of a continuous spatial process where the variable of interest is the location of the events.
 
-* Georeferenced: data where observations are associated with latitude and longitude 
-  * Locations may be unique or repeated (stations)
+.tiny[
+Renner, I.W., Elith, J., Baddeley, A., Fithian, W., Hastie, T., Phillips, S.J., Popovic, G., and Warton, D.I. 2015. Point process models for presence‐only analysis. Methods Ecol Evol 6(4): 366–379.
+]
+
 ---
 
-# Why is space important? 
+# Spatial data types
 
-* Data covary spatially (data that are closer are more similar)
+### Geostatistical
+
+Observations of a continuous spatial process observed at a chosen set of points. .tiny[*We're focusing on geostatistical models.]
+
+Data are georeferenced: observations are associated with latitude and longitude. Locations may be unique or repeated (stations)
+
+---
+
+# Why is space important?
+
+Data covary spatially (data that are closer are more similar)
 
 --
 
-* Relationship between distance and covariance can be described with a spatial covariance function
-
---
-
-* Covariance function in 2D may be
-  * isotropic (same covariance in each direction)
-  * anisotropic (different in each direction)
-
-<!-- * Assumed stationary -->
+Ignoring this hurts our predictions and messes up our quantification of uncertainty
 
 ---
 
@@ -315,11 +270,11 @@ background-size: 35%
 
 # Random field
 
-* A 2 dimensional "Gaussian Process"
+A 2 dimensional "Gaussian Process".
 
 --
 
-* A realization from a multivariate normal distribution with some covariance function
+A realization from a multivariate normal distribution constrained by some covariance function.
 
 ---
 background-image: url("images/elmo.png")
@@ -328,29 +283,277 @@ background-size: 30%
 
 # Random field
 
-* A way of estimating a wiggly surface to account for spatial and/or spatiotemporal correlation in data.
+A way of estimating a wiggly surface to account for spatial and/or spatiotemporal correlation in data.
 
 --
 
-* Alternatively, a way of estimating a wiggly surface to account for "latent" or unobserved variables.
+Alternatively, a way of estimating a wiggly surface to account for unobserved spatially structured variables.
 
 --
 
-* As a bonus, it provides useful covariance parameter estimates: spatial variance and the distance at data points are effectively uncorrelated ("range")
+As a bonus, it provides useful parameter estimates: spatial variance (magnitude of wiggles) and the rate at which data become uncorrelated with distance (how smooth are the wiggles).
 
 <!-- TODO: include nugget / sill? Show slide with semivariogram image? -->
 ---
 
-# Many ways to simulate random fields
+# Correlation/covariance functions
 
-* `RandomFields::RFsimulate()` simulates univariate / multivariate fields
-* `fields::sim.rf()` simulates random fields on a grid
-* `geoR::grf()` simulates random fields with irregular observations
-* `glmmfields::sim_glmmfields()` simulates random fields with/without extreme values
-* `sdmTMB::sdmTMB_simulate()` simulates univariate fields with `sdmTMB`
+- These constrain the random field MVN distribution.
 
-???
-Homework: try to work through some of these yourself. Make some plots, and see how changing the covariance affects the smoothness of these fields.
+--
+
+- They define how correlation decays with distance.
+
+--
+
+- Can be isotropic or anisotropic.
+
+--
+
+- Common choices: exponential, Gaussian, Matérn.
+
+---
+
+# Exponential correlation
+
+$$
+\mathcal{C}\left(d\right) = e^{ -d/\rho }
+$$
+
+- $d$ is distance
+- $\rho$ controls the rate of correlation decay with distance
+
+```{r exp-cov, fig.asp=0.45}
+exp_cor<- function(d, rho = 0.2) exp(-d/rho)
+d <- data.frame(x = seq(0, 1, length.out = 300))
+d1 <- data.frame(x = d$x, y = exp_cor(d$x, rho = 0.2), rho = 0.2)
+d2 <- data.frame(x = d$x, y = exp_cor(d$x, rho = 0.1), rho = 0.1)
+d3 <- data.frame(x = d$x, y = exp_cor(d$x, rho = 0.4), rho = 0.4)
+
+dplyr::bind_rows(list(d1, d2, d3)) |>
+  ggplot(aes(x, y, colour = rho, group = rho)) + geom_line() +
+  labs(y = "Correlation", x = "Distance") +
+  coord_cartesian(expand = FALSE)
+```
+
+---
+
+# Gaussian or squared exponential correlation
+
+$$
+\mathcal{C}\left(d\right) = e^{ -\left(d/\rho\right)^{2} }
+$$
+- $d$ is distance
+- $\rho$ controls the rate of correlation decay with distance
+
+```{r gauss-cov, fig.asp=0.45}
+gaus_cor<- function(d, rho = 0.2) exp(-(d/rho)^2)
+d <- data.frame(x = seq(0, 1, length.out = 300))
+d1 <- data.frame(x = d$x, y = gaus_cor(d$x, rho = 0.2), rho = 0.2)
+d2 <- data.frame(x = d$x, y = gaus_cor(d$x, rho = 0.1), rho = 0.1)
+d3 <- data.frame(x = d$x, y = gaus_cor(d$x, rho = 0.4), rho = 0.4)
+dplyr::bind_rows(list(d1, d2, d3)) |>
+  ggplot(aes(x, y, colour = rho, group = rho)) + geom_line() +
+  labs(y = "Correlation", x = "Distance") +
+  coord_cartesian(expand = FALSE)
+```
+
+---
+
+# Matérn covariance
+
+Flexible, can be exponential or Gaussian shape or other shapes
+
+```{r matern-plot, fig.asp=0.51}
+x <- seq(from = 0, to = 1.5, length.out = 300)
+df <- data.frame(
+  x = rep(x, 4),
+  nu = sort(rep(c(0.5, 1, 2, 10), 100))
+)
+df$row <- seq(1, nrow(df))
+df <- dplyr::group_by(df, row) |>
+  dplyr::mutate(
+    cov =
+      rSPDE::matern.covariance(h = x, kappa = 5, nu = nu, sigma = 1)
+  )
+df$nu <- as.factor(df$nu)
+ggplot(df, aes(x, cov, col = nu, group = nu)) +
+  geom_line(size = 1.3, alpha = 0.8) +
+  xlab("Distance") +
+  ylab("Covariance") +
+  ggtitle("Matérn covariance") +
+  guides(col = guide_legend(title = expression(nu))) +
+  coord_cartesian(expand = FALSE)
+```
+
+---
+
+# Matérn covariance
+
+.xsmall[
+$$
+\mathcal{C} \left(d \right) = \frac{\sigma^2}{2^{\nu - 1}\Gamma(\nu)}
+    (\kappa d)^\nu K_\nu \kappa d \quad 😱
+$$
+]
+
+.xsmall[
+- $d$ = distance
+- $\Gamma$ = the gamma function
+- $K_\nu$ = modified Bessel function of the 2nd kind(!)
+- $\kappa$ = decorrelation rate
+- $\sigma^2$ = variance
+- $\nu$ is fixed at 1 to take advantage of SPDE
+]
+
+---
+
+# Matérn covariance range
+
+Range = distance where correlation has decayed<br>to $\sim$ 0.13.
+
+$\mathrm{range} = \sqrt{8 \nu} / \kappa$, so if $\nu = 1$, $\mathrm{range} = \sqrt{8} / \kappa$
+
+```{r matern-range, warning=FALSE, message=FALSE, fig.asp=0.35}
+predictor_dat <- expand.grid(
+  x = seq(0, 1, length.out = 100),
+  y = seq(0, 1, length.out = 100),
+  year = seq_len(1)
+)
+sim_mesh <- make_mesh(predictor_dat, xy_cols = c("x", "y"), cutoff = 0.01)
+s1 <- sdmTMB_simulate(
+  formula = ~1,
+  data = predictor_dat,
+  mesh = sim_mesh,
+  range = 0.2,
+  phi = 0.1,
+  sigma_O = 0.2,
+  seed = 1,
+  B = 0
+)
+sim_g1 <- ggplot(s1, aes(x, y, fill = mu)) +
+  geom_raster(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "C") +
+  coord_cartesian(expand = FALSE) +
+  theme_light() +
+  ggtitle("(a) Range = 0.2") +
+  labs(x = "X", y = "Y")
+
+s2 <- sdmTMB_simulate(
+  formula = ~1,
+  data = predictor_dat,
+  mesh = sim_mesh,
+  range = 0.6,
+  phi = 0.1,
+  sigma_O = 0.2,
+  seed = 1,
+  B = 0
+)
+sim_g2 <- ggplot(s2, aes(x, y, fill = mu)) +
+  geom_raster(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "C") +
+  coord_cartesian(expand = FALSE) +
+  theme_light() +
+  ggtitle("(b) Range = 0.6") +
+  labs(x = "X", y = "Y")
+
+x <- seq(0, 1, length.out = 200)
+r <- c(0.2, 0.6)
+df <- data.frame(
+  x = rep(x, length(r)),
+  range = rep(r, each = length(x))
+)
+matern <- function(h, sigma = 1, kappa, nu = 1) {
+  ret <- (sigma^2/(2^(nu - 1) * gamma(nu))) *
+    ((kappa * abs(h))^nu) *
+    besselK(kappa * abs(h), nu)
+  ret
+  ret[x == 0] <- sigma^2
+  ret
+}
+blues <- RColorBrewer::brewer.pal(length(r) + 1, "Blues")[-1]
+df$cor <- matern(df$x, kappa = sqrt(8) / df$range)
+sim_g3 <- ggplot(df, aes(x, cor, col = as.factor(range), group = as.factor(range))) +
+  geom_line() +
+  theme_light() +
+  xlab("Distance") +
+  ylab("Correlation") +
+  labs(colour = "Range") +
+  coord_cartesian(expand = FALSE, ylim = c(0, 1)) +
+  scale_colour_manual(values = blues) +
+  geom_hline(yintercept = 0.13, col = "grey50", lty = 2) +
+  scale_x_continuous(breaks = r) +
+  theme(legend.position = c(0.7, 0.7)) +
+  ggtitle("(c) Matérn correlation function")
+
+cowplot::plot_grid(sim_g1, sim_g2, sim_g3, align = "h", ncol = 3L)
+```
+
+.tiny[
+Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussian fields and Gaussian Markov random fields: the stochastic partial differential equation approach. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 73(4): 423–498.
+]
+
+---
+
+# Predictive process models
+
+* Estimate spatial field as random effects
+
+--
+
+* High dimensional datasets computationally challenging
+
+--
+
+* Gaussian process predictive process models:
+  * Estimate values at a subset of locations in the time series
+  *   'knots', 'vertices', or 'control points'
+  * Use covariance function to interpolate from knots to locations of observations
+
+---
+
+# Predictive process models
+
+* More knots (vertical dashed lines) = more wiggliness & parameters to estimate
+
+```{r show-gp, fig.height=4}
+x <- seq(1, 50)
+d <- as.matrix(dist(x, diag = TRUE))
+set.seed(123)
+df <- data.frame(
+  x = x,
+  true = c(spam::rmvnorm(1, mu = 0, Sigma = 1 * exp(-0.05 * d)))
+)
+df$y <- rnorm(df$true, df$true, 0.1)
+
+f1 <- mgcv::gam(y ~ s(x, k = 25, bs = "bs"), data = df)
+
+knots <- data.frame("x" = f1$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
+g1 <- ggplot(df, aes(x, y)) +
+  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
+  geom_point(col = "red", alpha = 0.7) +
+  theme(panel.grid = element_blank()) +
+  xlab("") +
+  ylab("Observations") +
+  geom_smooth(
+    method = "gam",
+    formula = y ~ s(x, bs = "bs", k = 25)
+  ) +
+  coord_cartesian(xlim = c(0, 50))
+
+f2 <- mgcv::gam(y ~ s(x, k = 7, bs = "bs"), data = df)
+knots <- data.frame("x" = f2$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
+
+g2 <- ggplot(df, aes(x, y)) +
+  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
+  geom_point(col = "red", alpha = 0.7) +
+  theme(panel.grid = element_blank()) +
+  xlab("") +
+  ylab("Observations") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "gp", k = 7)) +
+  coord_cartesian(xlim = c(0, 50))
+gridExtra::grid.arrange(g1, g2, ncol = 1)
+```
 
 ---
 
@@ -394,14 +597,14 @@ for(i in 1:nrow(grid_pars)) {
 sim_dat$sigma_O = paste0("sigma_O = ", sim_dat$sigma_O)
 sim_dat$range = paste0("range = ", sim_dat$range)
 ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(size=1) + 
-  scale_color_gradient2() + 
+  geom_point(size=1) +
+  scale_color_gradient2() +
   facet_wrap(range ~ sigma_O)
 ```
 
 ---
 
-# Effects of adding noise 
+# Effects of adding noise
 
 * Large observation error looks like noise
 
@@ -433,16 +636,16 @@ sim_dat <- sdmTMB_simulate(
 )
 
 ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(alpha=0.7, size=3) + 
+  geom_point(alpha=0.7, size=3) +
   scale_color_gradient2()
 ```
- 
+
 ---
-  
+
 # Moderate observation errors
 
 * $\sigma_{obs}$ = $\sigma_{O}$ = $\sigma_{E}$
-    
+
 ```{r sim-rf-med_phi, echo = FALSE, fig.asp=0.5}
 sim_dat <- sdmTMB_simulate(
   formula = ~1,
@@ -459,17 +662,17 @@ sim_dat <- sdmTMB_simulate(
 )
 
 ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(alpha=0.7, size=3) + 
+  geom_point(alpha=0.7, size=3) +
   scale_color_gradient2()
 ```
-  
-  
+
+
 ---
-     
-# Small observation errors  
-    
+
+# Small observation errors
+
 * $\sigma_{obs}$ << $\sigma_{O}$, $\sigma_{E}$
-    
+
 ```{r sim-rf-small_phi, echo = FALSE, fig.asp=0.5}
 sim_dat <- sdmTMB_simulate(
   formula = ~ 1 ,
@@ -486,53 +689,79 @@ sim_dat <- sdmTMB_simulate(
 )
 
 ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(alpha=0.7, size=3) + 
+  geom_point(alpha=0.7, size=3) +
   scale_color_gradient2()
 ```
 
 ---
 
-# Estimating random fields 
+class: center, middle, inverse
+
+# SPDE approach: what you need to know
+
+---
+
+# Estimating Gaussian random fields
 
 .small[
 * Georeferenced data often involve 1000s or more points
 
-* Like in the 1-D setting, we need to approximate the spatial field 
+* Like in the 1-D setting, we need to approximate the spatial field
   * Options include nearest neighbor methods, covariance tapering, etc.
 
-* sdmTMB uses an approach from INLA
+* sdmTMB uses the SPDE approach from INLA
   * for VAST users, this is the same
-  * INLA books:  
+  * INLA books:
     <https://www.r-inla.org/learnmore/books>
 ]
 
 ---
 
-# INLA and the SPDE approach
+# INLA, fmesher, and the SPDE approach
 
 .xsmall[
 * SPDE: stochastic partial differential equation
+]
 
-* The solution to a specific SPDE is a Gaussian random field (GRF) with Matérn covariance
+--
 
-* This, and sparse precision matrices, let us efficiently fit approximations to GRFs to large spatial datasets
+.xsmall[
+* A solution to a specific SPDE allows computing a precision matrix of a Gaussian *Markov* random field (GMRF) that is a good approximation to a Gaussian random field with **Matérn** covariance.
+]
 
+--
+
+.xsmall[
+* We can estimate this sparse precision matrix efficiently.
+]
+
+--
+
+.xsmall[
+* In short: the SPDE approach lets us efficiently estimate approximate Gaussian random fields by letting us work with GMRFs and their precision matrix.
+]
+
+--
+
+.xsmall[
 * INLA is software that performs data wrangling for SPDE estimation
   * INLA also performs approximate Bayesian estimation
-  * sdmTMB uses INLA to wrangle matrices, but uses TMB for maximum likelihood estimation
+  * sdmTMB uses fmesher/INLA to wrangle matrices, but uses TMB for maximum likelihood estimation
 ]
 
 .tiny[
-Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussian fields and Gaussian Markov random fields: the stochastic partial differential equation approach. Journal of the Royal Statistical Society: Series B. 73(4): 423–498.
+Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussian fields and Gaussian Markov random fields: the stochastic partial differential equation approach. Journal of the Royal Statistical Society: Series B (Statistical Methodology) 73(4): 423–498.
+
+Miller, D.L., Glennie, R., and Seaton, A.E. 2019. Understanding the Stochastic Partial Differential Equation approach to smoothing. JABES. doi:10.1007/s13253-019-00377-z.
 ]
 
 ---
 
 # Introducing meshes
 
-Implementing the SPDE with INLA requires constructing a 'mesh'
+The SPDE approach involves a triangulation over the area of interest; we call this a "mesh" or more accurately a "finite element mesh".
 
-```{r mesh-example, fig.width=6.5}
+```{r mesh-example, fig.width=5}
 mesh <- make_mesh(pcod, xy_cols = c("X", "Y"), cutoff = 10)
 ggplot() +
   inlabru::gg(mesh$mesh) +
@@ -544,14 +773,14 @@ ggplot() +
 
 # Mesh construction
 
-.small[
+.xsmall[
 * A unique mesh is generally made for each dataset
 * Rules of thumb:
   * More triangles = more computation time
   * More triangles = more fine-scale spatial predictions
+  * Finer resolution isn't always better
   * Borders with coarser resolution reduce number of triangles
-  * Use minimum edge size to avoid meshes becoming too fine
-  * Want fewer vertices than data points
+  * Use minimum edge size (cutoff) to avoid meshes becoming too fine
   * Triangle edge size needs to be smaller than spatial range
 
 * "How to make a bad mesh?" [Haakon Bakka's book](https://haakonbakkagit.github.io/btopic114.html)
@@ -561,7 +790,7 @@ ggplot() +
 
 # Building your own mesh
 
-* `INLA::inla.mesh.2d()`: lets many arguments be customized
+* E.g., `fmesher::fm_mesh_2d()`: lets many arguments be customized
 
 * `INLA::meshbuilder()`: Shiny app for constructing a mesh, provides R code
 
@@ -576,7 +805,7 @@ ggplot() +
 
 sdmTMB has a function `make_mesh()` to quickly construct a basic mesh
 
-Details in next set of slides
+But sdmTMB can also work with any fancier fmesher mesh.
 
 ---
 
@@ -615,5 +844,145 @@ ggplot() +
   coord_equal()
 ```
 
+---
+
+# SPDE matrices
+
+With the mesh, we can calculate 3 sparse matrices needed to calculate the precision matrix $\boldsymbol{Q}$
+
+$$
+\boldsymbol{Q} = \tau^2 \left(\kappa^4\boldsymbol{C_0} + 2\kappa^2\boldsymbol{G}_1 + \boldsymbol{G}_2 \right),
+$$
+
+- $\boldsymbol{C_0}$, $\boldsymbol{G_1}$, and $\boldsymbol{G_2}$ are these sparse matrices
+- $\tau$ scales the precision matrix
+- $\kappa$ is the decorrelation rate
+
+---
+
+# Getting back from $\tau$ to variance
+
+.xsmall[
+With this precision matrix representation of the Matérn, we need a way of converting from $\tau$ back to variance $\sigma^2$:
+]
+
+.small[
+$\sigma^2 = \frac{1}{\left (4 \pi \tau^2 \kappa^2 \right)}$
+]
+
+.xsmall[
+$\tau$ and $\kappa$ are parameters from the Matérn precision we will estimate.
+
+Note that $\tau$ is inverse to $\sigma$.
+]
+
+```{r marg-variance, fig.asp=0.4}
+predictor_dat <- expand.grid(
+  x = seq(0, 1, length.out = 100),
+  y = seq(0, 1, length.out = 100),
+  year = seq_len(1)
+)
+sim_mesh <- make_mesh(predictor_dat, xy_cols = c("x", "y"), cutoff = 0.01)
+.s1 <- sdmTMB_simulate(
+  formula = ~1,
+  data = predictor_dat,
+  mesh = sim_mesh,
+  range = 0.6,
+  phi = 0.1,
+  sigma_O = sqrt(1),
+  seed = 1,
+  B = 0
+)
+.s2 <- sdmTMB_simulate(
+  formula = ~1,
+  data = predictor_dat,
+  mesh = sim_mesh,
+  range = 0.6,
+  phi = 0.1,
+  sigma_O = sqrt(0.3),
+  seed = 1,
+  B = 0
+)
+lims <- range(c(.s2$mu, .s1$mu))
+
+sim_g3 <- ggplot(.s1, aes(x, y, fill = mu)) +
+  geom_raster(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "C", limits = lims) +
+  coord_cartesian(expand = FALSE) +
+  theme_light() +
+  ggtitle("(a) Variance = 1") +
+  labs(x = "X", y = "Y")
+
+sim_g4 <- ggplot(.s2, aes(x, y, fill = mu)) +
+  geom_raster(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "C", limits = lims) +
+  coord_cartesian(expand = FALSE) +
+  theme_light() +
+  ggtitle("(b) Variance = 0.3") +
+  labs(x = "X", y = "Y")
+cowplot::plot_grid(sim_g3, sim_g4, align = "v")
+```
+
+---
+
+# Interpolation from mesh to data
+
+.small[
+We usually interpolate from the mesh vertices (the random effects) to any observation or prediction locations using an interpolation (or "projection") matrix.
+]
+
+This is often called the "A matrix".
+
+.xsmall[
+```{r A-matrix, echo=TRUE}
+loc <- as.matrix(sdmTMB::pcod[,c("X", "Y")])
+mesh <- fmesher::fm_mesh_2d(loc = loc, cutoff = 5)
+A <- fmesher::fm_basis(mesh, loc = loc)
+nrow(loc) # number of data locations
+mesh$n # number of mesh vertices
+dim(A) # interpolation matrix dimensions
+```
+]
+
+---
+
+# Putting it all together
+
+.xsmall[
+**Before fitting:**
+
+1. Create a mesh
+2. Calculate SPDE matrices
+3. Calculate interpolation matrices
+]
+
+--
+
+.xsmall[
+**Within the model:**
+
+1. Use your SPDE matrices to construct the precision matrix
+2. Evaluate the likelihood of the GMRF
+3. Project from random effect vertices to the data locations
+4. Add in anything else you want (e.g., other parameter effects)
+4. Evaluate the data likelihood
+5. Project from random effects vertices to any new prediction locations
+6. Calculate derived quantities such as range and marginal variance
+]
+
+---
+class: center, middle, inverse
+
+background-image: url("images/flickr-9fTfup.jpg")
+background-position: center
+background-size: 100%
+
+<div class="footer">CC BY-ND 2.0: https://flic.kr/p/9fTfup</div> 
+
+---
+
+# The good news
+
+This is what sdmTMB does for you. 🤓
 
 

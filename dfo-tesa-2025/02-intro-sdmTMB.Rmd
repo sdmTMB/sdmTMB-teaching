@@ -38,11 +38,17 @@ A need for reproducible code and methods for assessments [(Anderson et al. 2019)
 
 # sdmTMB highlights
 
-sdmTMB is a user-friendly R package for modeling spatial processes
+* sdmTMB is a user-friendly R package for modeling spatial processes
+
+--
 
 * Familiar syntax to widely used functions/packages; `glm()`, mgcv, glmmTMB, etc.
+
+--
   
 * Performs fast (marginal) maximum likelihood estimation via TMB
+  
+--
   
 * Widely applicable to species distribution modelling, stock assessment inputs, bycatch models, etc. that include spatially referenced data
 
@@ -96,9 +102,9 @@ pak::pak("pbs-assess/sdmTMB", dependencies = TRUE)
 
 3. Fit the model: .blue[`sdmTMB()`]
 
-4. Inspect the model: .blue[`print()`], .blue[`sanity()`], .blue[`tidy()`], .blue[`residuals()`]
+4. Inspect the model: .blue[`print()`], .blue[`sanity()`], .blue[`tidy()`], .blue[`residuals()`, .blue[`coef()`], ...]
 
-5. Predict from the model: .blue[`predict()`]
+5. Predict from the model: .blue[`predict()`], .blue[`simulate()`]
 
 6. Get derived quantities: .blue[`get_index()`, etc.]
 
