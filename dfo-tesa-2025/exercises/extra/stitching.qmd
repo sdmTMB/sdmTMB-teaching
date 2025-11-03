@@ -1,0 +1,604 @@
+---
+title: "Stitching survey data"
+format: html
+editor: visual
+execute:
+  echo: true
+  eval: true
+---
+
+# Goals:
+
+- Learn how to combine or "stitch" together data from multiple surveys that use the same gear but don't have the same spatial coverage each year.
+- Fit models with different temporal correlation structures to fill gaps.
+- Compare models using AIC, cross-validation, and simulation testing.
+
+```{r, message=FALSE, warning=FALSE}
+#| echo: false
+library(sdmTMB)
+library(dplyr)
+library(ggplot2)
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+options(ggplot2.discrete.colour = RColorBrewer::brewer.pal(8, "Set2"))
+options(ggplot2.discrete.fill = RColorBrewer::brewer.pal(8, "Set2"))
+theme_set(theme_light())
+```
+
+# The data
+
+We will work with quillback rockfish data from two hard bottom longline (HBLL) surveys in the inside waters of British Columbia: HBLL INS N (North) and HBLL INS S (South). The key challenge is that these surveys don't occur every year, creating gaps in our time series.
+
+```{r}
+d <- readRDS("~/src/gfsynopsis-2024/report/data-cache-2025-03/quillback-rockfish.rds")
+# d <- readRDS("~/src/gfsynopsis-2024/report/data-cache-2025-03/north-pacific-spiny-dogfish.rds")
+# d <- readRDS("~/src/gfsynopsis-2024/report/data-cache-2025-03/lingcod.rds")
+d <- d$survey_sets
+# Filter to the two HBLL inside surveys
+d <- filter(d, survey_abbrev %in% c("HBLL OUT N", "HBLL OUT S"))
+all_yrs <- sort(unique(d$year))
+```
+
+Let's visualize the spatial distribution:
+
+```{r}
+ggplot(d, aes(longitude, latitude, size = density_ppkm2, colour = density_ppkm2)) +
+  geom_point(pch = 21) +
+  facet_wrap(~year) +
+  labs(title = "Quillback Rockfish Density")
+```
+
+### Exercise:
+
+1.  Which years have data from both surveys? Which have data from only one?
+2.  What challenges might arise when trying to estimate an abundance index for years with missing survey data?
+
+# Prepare data and mesh
+
+```{r}
+# Add UTM coordinates
+d <- add_utm_columns(d, utm_crs = 32610)
+
+# Create spatial mesh
+mesh <- make_mesh(d, c("X", "Y"), cutoff = 10)
+plot(mesh)
+```
+
+# Model 1: IID spatiotemporal fields
+
+Our first approach treats each year independently with IID (independent and identically distributed) spatiotemporal fields. This is a reasonable starting point but doesn't help us "borrow strength" across years.
+
+```{r}
+fit_iid <- sdmTMB(
+  density_ppkm2 ~ factor(year),
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = T
+)
+
+fit_iid
+```
+
+Check for anisotropy:
+
+```{r}
+plot_anisotropy(fit_iid)
+```
+
+## Set up prediction grid
+
+To calculate abundance indices, we need a prediction grid. We'll also create a lookup table to track which survey(s) occurred in each year.
+
+```{r}
+# Use the standard HBLL inside north grid
+grid_one_n <- gfplot::hbll_inside_n_grid$grid |>
+  rename(longitude = X, latitude = Y)
+grid_one_s <- gfplot::hbll_inside_s_grid$grid |>
+  rename(longitude = X, latitude = Y)
+grid_one <- bind_rows(grid_one_s, grid_one_s)
+grid_one <- add_utm_columns(grid_one, c("longitude", "latitude"), utm_crs = 32610)
+grid <- replicate_df(grid_one, "year", unique(d$year))
+
+grid_all_yrs <- replicate_df(grid_one, "year", all_yrs)
+
+ggplot(grid, aes(X, Y)) + geom_point()
+```
+
+```{r}
+# Use the standard HBLL inside north grid
+grid_one_n <- gfplot::hbll_n_grid$grid |>
+  rename(longitude = X, latitude = Y)
+grid_one_s <- gfplot::hbll_s_grid$grid |>
+  rename(longitude = X, latitude = Y)
+grid_one <- bind_rows(grid_one_s, grid_one_s)
+grid_one <- add_utm_columns(grid_one, c("longitude", "latitude"), utm_crs = 32610)
+grid <- replicate_df(grid_one, "year", unique(d$year))
+
+grid_all_yrs <- replicate_df(grid_one, "year", all_yrs)
+
+ggplot(grid, aes(X, Y)) + geom_point()
+```
+
+Create lookup for which surveys occurred when
+
+```{r}
+lu <- select(d, year, survey_abbrev) |>
+  distinct()
+# lu <- filter(lu, year != 2021) |>
+  # bind_rows(tibble(year = 2021, survey_abbrev = "Both")) |>
+  # arrange(year)
+```
+
+Generate predictions and calculate an index:
+
+```{r}
+p <- predict(fit_iid, newdata = grid, return_tmb_object = TRUE)
+ind_iid <- get_index(p)
+
+left_join(ind_iid, lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  labs(x = "Year", y = "Abundance index", colour = "Survey")
+```
+
+### Exercise:
+
+1.  What do you notice about the confidence intervals for years with only one survey vs. years with both?
+2.  Does this model really help us "stitch" the surveys together, or is it just predicting for years with data?
+
+# Model 2: Time-varying intercept (random walk)
+
+This model includes a time-varying intercept that follows a random walk, which can help smooth the index through missing years. We use IID spatiotemporal fields and include `extra_time` for years with missing data.
+
+```{r}
+fit_tv <- sdmTMB(
+  density_ppkm2 ~ 0,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  spatiotemporal = "iid",
+  time_varying = ~1,
+  time_varying_type = "rw",
+  spatial = "on",
+  extra_time = c(2006, 2017, 2020),
+  silent = FALSE
+)
+
+sanity(fit_tv)
+```
+
+Generate predictions:
+
+```{r}
+p_tv <- predict(fit_tv, newdata = grid_all_yrs, return_tmb_object = TRUE)
+ind_tv <- get_index(p_tv)
+
+left_join(ind_tv, lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  labs(x = "Year", y = "Abundance index", colour = "Survey")
+```
+
+# Model 2b: RW2
+
+```{r}
+fit_tv2 <- sdmTMB(
+  density_ppkm2 ~ 1,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  spatiotemporal = "iid",
+  time_varying = ~1,
+  time_varying_type = "rw2",
+  spatial = "on",
+  extra_time = c(2006, 2017, 2020),
+  silent = F,
+   # priors = sdmTMBpriors(
+   #    sigma_V = gamma_cv(location = 0.2, cv = 0.1)
+   #  )
+)
+
+fit_tv2
+
+p_tv2 <- predict(fit_tv2, newdata = grid_all_yrs, return_tmb_object = TRUE)
+ind_tv2 <- get_index(p_tv2)
+
+left_join(ind_tv2, lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  labs(x = "Year", y = "Abundance index", colour = "Survey")
+```
+
+### Exercise:
+
+1.  How do the predictions for missing years differ from Model 1?
+2.  What assumptions is this model making about abundance in the missing years?
+
+# Model 3: Random walk spatiotemporal fields
+
+This model uses a random walk for the spatiotemporal fields themselves, allowing the spatial pattern to evolve smoothly over time.
+
+```{r}
+fit_rw <- sdmTMB(
+  density_ppkm2 ~ 1,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  spatiotemporal = "rw",
+  spatial = "on",
+  extra_time = c(2006, 2017, 2020),
+  silent = FALSE
+)
+
+fit_rw
+```
+
+Generate predictions:
+
+```{r}
+p_rw <- predict(fit_rw, newdata = grid_all_yrs, return_tmb_object = TRUE)
+ind_rw <- get_index(p_rw)
+
+left_join(ind_rw, lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  labs(x = "Year", y = "Abundance index", colour = "Survey")
+```
+
+# Model comparison
+
+Compare models using AIC:
+
+```{r}
+AIC(fit_rw, fit_tv, fit_iid)
+```
+
+Visualize all three models together:
+
+```{r}
+bind_rows(
+  mutate(ind_rw, model = "Random walk random field"),
+  mutate(ind_tv, model = "Time-varying random walk"),
+  mutate(ind_iid, model = "IID fields, factor years")
+) |>
+  left_join(lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  facet_wrap(~model) +
+  labs(x = "Year", y = "Abundance index", colour = "Survey")
+```
+
+### Exercise:
+
+1.  Which model is preferred by AIC?
+2.  How do the models differ in their estimates for the missing years (2006, 2017, 2020)?
+3.  Which model would you choose and why? What additional information would help you decide?
+
+# Simulation testing
+
+We can simulate data from one model and see if we can recover the index with another. This helps us understand what each model can and cannot estimate.
+
+```{r}
+set.seed(42)
+
+# Simulate data from the random walk model
+d$sim_density_ppkm2 <- simulate(fit_rw, nsim = 1)
+
+# Fit IID model to simulated data
+fit_sim <- sdmTMB(
+  sim_density_ppkm2 ~ factor(year),
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE
+)
+
+# Calculate index
+p_sim <- predict(fit_sim, newdata = grid, return_tmb_object = TRUE)
+ind_sim <- get_index(p_sim)
+
+left_join(ind_sim, lu) |>
+  ggplot(aes(year, est, ymin = lwr, ymax = upr, colour = survey_abbrev)) +
+  geom_pointrange() +
+  labs(title = "Index from Simulated Data")
+```
+
+### Exercise:
+
+1.  How well does the IID model recover the random walk dynamics?
+2.  Try the opposite: simulate from `fit_iid` (IID) and fit with `fit_rw`. What happens?
+
+# Residual diagnostics
+
+Check residuals using DHARMa-style residuals:
+
+```{r}
+simulate(fit_rw, 200, type = "mle-mvn") |> dharma_residuals(fit_rw)
+simulate(fit_tv, 200, type = "mle-mvn") |> dharma_residuals(fit_tv)
+simulate(fit_iid, 200, type = "mle-mvn") |> dharma_residuals(fit_iid)
+```
+
+### Exercise:
+
+1.  Do any of the models show obvious residual problems?
+2.  Can residuals alone tell us which model is "correct" for the missing years?
+
+# Cross-validation
+
+Leave-future-out cross-validation can help assess predictive performance. This takes a while to run!
+
+```{r}
+library(future)
+plan(multisession, workers = future::availableCores()/2)
+
+cv_iid <- sdmTMB_cv(
+  density_ppkm2 ~ 0,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  spatiotemporal = "iid",
+  spatial = "on",
+  time_varying = ~1,
+  extra_time = c(2006, 2017, 2020),
+  lfo = TRUE,
+  lfo_forecast = 1,
+  lfo_validations = 10,
+  control = sdmTMBcontrol(
+    start = list(ln_tau_V = matrix(20, 1, 1)),
+    map = list(ln_tau_V = factor(NA))
+  )
+)
+
+cv_rw <- sdmTMB_cv(
+  density_ppkm2 ~ 1,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  extra_time = c(2006, 2017, 2020),
+  spatial = "on",
+  spatiotemporal = "rw",
+  lfo = TRUE,
+  lfo_forecast = 1,
+  lfo_validations = 10
+)
+
+# test with a constant random walk penalty:
+ln_tau_V_hat <- get_pars(fit_tv)$ln_tau_V
+cv_tv <- sdmTMB_cv(
+  density_ppkm2 ~ 0,
+  data = d,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  extra_time = c(2006, 2017, 2020),
+  spatial = "on",
+  spatiotemporal = "iid",
+  time_varying = ~1,
+  lfo = TRUE,
+  lfo_forecast = 1,
+  lfo_validations = 10,
+  control = sdmTMBcontrol(
+    start = list(ln_tau_V = ln_tau_V_hat),
+    map = list(ln_tau_V = factor(NA))
+  )
+)
+```
+
+Compare predictive performance (higher log likelihood is better)
+
+```{r}
+cv_iid$sum_loglik
+cv_rw$sum_loglik
+cv_tv$sum_loglik
+```
+
+To better interpret these differences, let's look at the fold-wise log likelihoods. This shows whether one model consistently outperforms another or if differences are driven by a few specific years:
+
+```{r}
+cv_results <- bind_rows(
+  tibble(fold = seq_along(cv_iid$fold_loglik),
+         loglik = cv_iid$fold_loglik,
+         model = "IID fields, independent years"),
+  tibble(fold = seq_along(cv_rw$fold_loglik),
+         loglik = cv_rw$fold_loglik,
+         model = "Random walk random field"),
+  tibble(fold = seq_along(cv_tv$fold_loglik),
+         loglik = cv_tv$fold_loglik,
+         model = "Time-varying random walk")
+) |> 
+  group_by(fold) |> 
+  mutate(loglik = loglik - loglik[model == "Time-varying random walk"])
+
+ggplot(cv_results, aes(fold, loglik, colour = model)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "CV fold (time step)",
+       y = "Log likelihood difference\n(relative to time-varying random walk)",
+       colour = "Model") +
+  theme(legend.position = "bottom")
+```
+
+Calculate the standard error (SE) of the differences to assess if they're meaningful:
+
+```{r}
+# Calculate SE of ELPD differences following Vehtari et al.
+cv_summary <- cv_results |>
+  group_by(model) |>
+  summarise(
+    elpd_diff = sum(loglik),
+    se_diff = sqrt(n()) * sd(loglik),
+    .groups = "drop"
+  ) |>
+  arrange(desc(elpd_diff))
+
+cv_summary
+```
+
+The Expected Log Predictive Density (ELPD) differences tell us about predictive performance. The SE accounts for variability across folds. As a rule of thumb, differences exceeding about 2 SE are generally considered meaningful.
+
+Or differences of at least 5 log likelihood units.
+
+### Exercise:
+
+1.  What is leave-future-out cross-validation testing?
+2.  How is this different from standard k-fold cross-validation?
+3.  Why might this be particularly useful for evaluating models that predict missing years?
+4.  Looking at the fold-wise plot, does one model consistently outperform the others, or are differences driven by specific folds?
+
+## Key principles
+
+- This is hard and we don't have great answers
+- AIC and residuals alone aren't going to save you
+- Be creative with visualizations
+- *Penalize time as little as possible*
+- Try to think of creative ways to use cross validation
+- Random walk random fields will also "work" but can over penalize time
+- If you really have to simulation testing can help answer thorny questions
+
+
+
+```{r}
+library(future)
+plan(multisession, workers = future::availableCores()/2)
+
+lu$fold_id <- seq_len(nrow(lu))
+dat <- left_join(d, lu, by = "year")
+
+cv_iid <- sdmTMB_cv(
+  density_ppkm2 ~ 0,
+  data = dat,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  spatiotemporal = "iid",
+  spatial = "on",
+  fold_ids = "fold_id",
+  time_varying = ~1,
+  extra_time = c(2006, 2017, 2020),
+  control = sdmTMBcontrol(
+    start = list(ln_tau_V = matrix(20, 1, 1)),
+    map = list(ln_tau_V = factor(NA))
+  )
+)
+
+cv_rw <- sdmTMB_cv(
+  density_ppkm2 ~ 1,
+  data = dat,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  extra_time = c(2006, 2017, 2020),
+  spatial = "on",
+  spatiotemporal = "rw",
+  fold_ids = "fold_id"
+)
+
+# test with a constant random walk penalty:
+ln_tau_V_hat <- get_pars(fit_tv)$ln_tau_V
+cv_tv <- sdmTMB_cv(
+  density_ppkm2 ~ 0,
+  data = dat,
+  mesh = mesh,
+  time = "year",
+  family = tweedie(),
+  anisotropy = TRUE,
+  extra_time = c(2006, 2017, 2020),
+  spatial = "on",
+  spatiotemporal = "iid",
+  time_varying = ~1,
+  fold_ids = "fold_id",
+  control = sdmTMBcontrol(
+    start = list(ln_tau_V = ln_tau_V_hat),
+    map = list(ln_tau_V = factor(NA))
+  )
+)
+```
+
+CV for just 2021?
+
+```{r}
+train1 <- filter(d, !(year == 2021 & survey_abbrev == "HBLL INS N"))
+test1 <- filter(d, (year == 2021 & survey_abbrev == "HBLL INS N"))
+mesh1 <- make_mesh(train1, c("X", "Y"), mesh = mesh$mesh)
+
+train2 <- filter(d, !(year == 2021 & survey_abbrev == "HBLL INS S"))
+test2 <- filter(d, (year == 2021 & survey_abbrev == "HBLL INS N"))
+mesh2 <- make_mesh(train2, c("X", "Y"), mesh = mesh$mesh)
+
+fit_iid1 <- sdmTMB(
+  catch_count ~ factor(year),
+  data = train1,
+  mesh = mesh1,
+  time = "year",
+  family = nbinom2(),
+  anisotropy = F
+)
+fit_iid2 <- update(fit_iid1, data = train2, mesh = mesh2)
+
+fit_tv1 <- sdmTMB(
+  catch_count ~ 0,
+  data = train1,
+  mesh = mesh1,
+  time_varying = ~ 1,
+  time = "year",
+  family = nbinom2(),
+  extra_time = c(2006, 2017, 2020),
+  anisotropy = F
+)
+fit_tv2 <- update(fit_tv1, data = train2, mesh = mesh2)
+
+fit_rw1 <- sdmTMB(
+  catch_count ~ 1,
+  data = train1,
+  mesh = mesh1,
+  spatiotemporal = "rw",
+  time = "year",
+  family = nbinom2(),
+  extra_time = c(2006, 2017, 2020),
+  anisotropy = F
+)
+fit_rw2 <- update(fit_rw1, data = train2, mesh = mesh2)
+
+p_iid1 <- predict(fit_iid1, type = "response", newdata = test1)
+p_tv1 <- predict(fit_tv1, type = "response", newdata = test1)
+p_rw1 <- predict(fit_rw1, type = "response", newdata = test1)
+
+p_iid2 <- predict(fit_iid2, type = "response", newdata = test2)
+p_tv2 <- predict(fit_tv2, type = "response", newdata = test2)
+p_rw2 <- predict(fit_rw2, type = "response", newdata = test2)
+
+dnbinom(test1$catch_count, size = 0.87, mu = p_iid1$est, log = TRUE) |> sum()
+dnbinom(test1$catch_count, size = 0.87, mu = p_tv1$est, log = TRUE) |> sum()
+dnbinom(test1$catch_count, size = 0.87, mu = p_rw1$est, log = TRUE) |> sum()
+
+dnbinom(test2$catch_count, size = 0.87, mu = p_iid2$est, log = TRUE) |> sum()
+dnbinom(test2$catch_count, size = 0.87, mu = p_tv2$est, log = TRUE) |> sum()
+dnbinom(test2$catch_count, size = 0.87, mu = p_rw2$est, log = TRUE) |> sum()
+
+
+
+p <- 1.34
+fishMod::dTweedie(test1$density_ppkm2, p = p, mu = p_iid1$est, phi = 96.25, LOG = TRUE) |> sum()
+fishMod::dTweedie(test1$density_ppkm2, p = p, mu = p_tv1$est, phi = 96.25, LOG = TRUE) |> sum()
+
+fishMod::dTweedie(test2$density_ppkm2, p = p, mu = p_iid2$est, phi = 96.25, LOG = TRUE) |> sum()
+fishMod::dTweedie(test2$density_ppkm2, p = p, mu = p_tv2$est, phi = 96.25, LOG = TRUE) |> sum()
+
+```
+
