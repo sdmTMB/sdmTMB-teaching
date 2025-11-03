@@ -153,7 +153,7 @@ fit_sm <- sdmTMB(
 
 ```{r pred-all}
 newdf <- data.frame(
-  year = unique(fit_ar1$data$year),
+  year = fit_ar1$time_lu$time_from_data,
   X = mean(pcod$X),
   Y = mean(pcod$Y),
   depth_scaled = mean(pcod$depth_scaled),
@@ -193,7 +193,7 @@ ggplot(pred_df, aes(year, exp(est), ymin = exp(est - 2 * est_se), ymax = exp(est
 
 ```{r pred-ar1-plot-eps}
 one_yr <- qcs_grid
-grid <- purrr::map_dfr(unique(fit_ar1$data$year), function(i) {
+grid <- purrr::map_dfr(fit_ar1$time_lu$time_from_data, function(i) {
   one_yr$year <- i
   one_yr
 })

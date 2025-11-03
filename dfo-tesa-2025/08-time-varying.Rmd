@@ -267,11 +267,11 @@ ggplot(p, aes(depth, exp(est),
 
 # Time-varying coefficient notes
 
-* `time_varying` is a formula for coefficients that follow a random walk over time
+* `time_varying` is a formula for coefficients that follow a random walk or AR1 process over time
 
 --
 
-* Make sure a coefficient isn't in both `formula` and `time_varying`, this includes the intercept
+* Make sure a coefficient isn't in both `formula` and `time_varying` for `time_varying_type = "rw"`, this includes the intercept
 
 --
 

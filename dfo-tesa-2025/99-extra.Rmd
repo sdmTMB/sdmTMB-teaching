@@ -1,5 +1,5 @@
 ---
-title: "Related packages, troubleshooting, tips"
+title: "Related packages, troubleshooting, Q+A, tips"
 subtitle: "DFO TESA sdmTMB workshop"
 author: ""
 institute: ""
@@ -193,7 +193,7 @@ max(fit$gradients)
   
 ---
 
-# Smooth effects by year
+# How do we fit smooth effects by year?
 
 For example, separate smooths by year:
 
@@ -209,15 +209,175 @@ fit <- sdmTMB(
 ```
 
 ---
- 
-# Other warning messages
 
-* `Matrix` package, compiler warnings
-  * generally OK, but see glmmTMB page:  
-    <https://glmmtmb.github.io/glmmTMB/>
+# Can we use these models with fisheries dependent data?
 
-* TMB users forum  
-  <https://groups.google.com/g/tmb-users/>  
+- "Theoretically" no, in practice, yes. See "preferential sampling".
+
+--
+
+- Several papers show these can work very well for commercial CPUE and better than alternatives
+
+--
+
+- Theoretically, if all covariates driving the preferential sampling (e.g., depth, location) the sampling bias problem is ameliorated
+
+--
+
+- If worried, simulate it, or attempt to account for the preferential sampling.
+
+---
+
+# Things to be aware of when using environmental covariates
+
+- Same principles apply with sdmTMB as any GLM/GLMM/GAM
+
+--
+
+- Ideally, use the same source for observations and grid, especially if or index standardization
+
+--
+
+- Covariates and random fields can compete to explain the same variance; can be seen a feature or a bug
+
+--
+
+- Don't be surprised if the fields explain a lot more variance than your fixed effects!
+
+---
+
+# Can sdmTMB be used with tracking data?
+
+- Only sort of
+
+--
+
+- Not while taking advantage of all the information in the data
+
+--
+
+- If tracking data is reduced, yes
+
+---
+
+# Help me wrap my head around why we need the mesh and SPDE again
+
+- Two things going on speed-wise: mesh and SPDE
+
+--
+
+- Mesh lets us work with (far) fewer random effects
+
+--
+
+- Mesh also gives us the matrices we need to do the SPDE math
+
+--
+
+- SPDE lets us work with the precision matrix instead of covariance matrix; avoids matrix inversion, much faster
+
+--
+
+- RTMB examples: [direct MVN Gaussian random field](https://github.com/seananderson/RTMB-TESA-spatial/blob/main/exercises/01-spatial-dmvnorm.R), [SPDE GMRF](https://github.com/seananderson/RTMB-TESA-spatial/blob/main/exercises/02-spatial-spde.R)
+
+---
+
+# What are common problems when starting out?
+
+- Analysis paralysis with all the options
+
+--
+
+- Using (or starting with) too fine of a mesh
+
+--
+
+- Designing a mesh that doesn't cover your whole prediction area
+
+--
+
+- SDs that collapse to zero + poorly estimated range parameters
+
+--
+
+- Using different environmental data when fitting and predicting
+
+---
+
+# When should I use VAST, sdmTMB, or tinyVAST?
+
+- `¯\_(ツ)_/¯`
+
+--
+
+- Timeline: SpatialDeltaGLMM, VAST, sdmTMB, tinyVAST
+
+--
+
+- Current actively developped packages: sdmTMB and tinyVAST
+
+--
+
+- If set up the same, VAST, sdmTMB, and tinyVAST can all fit *identical* models and have been extensively tested
+
+---
+
+## sdmTMB vs. tinyVAST (in my opinion!)
+
+.small[
+- Neither going anywhere soon; Jim and I work on both
+]
+
+--
+
+.small[
+- sdmTMB more user friendly, focusses on univariate responses
+]
+
+--
+
+.small[
+- sdmTMB has the most built-up set of functions for summarizing, checking, and working with the output
+]
+
+--
+
+.small[
+- sdmTMB can only fit "multivariate" responses if the fields are independent across categories
+]
+--
+
+.small[
+- tinyVAST focusses on multivariate responses but (of course) also does univariate responses
+]
+
+--
+
+.small[
+- Compared to VAST: adds structural equation and dynamic structural equation modelling
+]
+
+---
+
+### Is there likely a need for High Performance Computing with sdmTMB?
+
+- sdmTMB can do multicore likelihood calculations<br>`TMB::openmp(n=3, DLL="sdmTMB")`
+
+--
+
+- But it's not always faster!
+
+--
+
+- Memory can be an issue with larger datasets, and especially many (correlated) random effects (i.e., large meshes, AR1/random walks)
+
+--
+
+- For index standardization memory issues: <br>`?get_index_split`
+
+--
+
+- If fitting lots of models, absolutely!
 
 ---
 

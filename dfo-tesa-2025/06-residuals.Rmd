@@ -122,7 +122,7 @@ u <- pgamma(q = y, shape = s1, scale = s2)
 qnorm(u)
 ```
 
-where `y`, are the observation and `s1` and `s2` are estimated in the model.
+where `y`, are the observations and `s1` and `s2` are estimated in the model.
   
 ---
 
@@ -201,8 +201,10 @@ Now use an optimizer to find the random effects that maximize the likelihood.
 These are what you're used to getting out of lme4, mgcv, glmmTMB, sdmTMB, etc.!
 ]
 
+--
+
 .small[
-Key concept: EB estimates are pulled towards the observations and are not expected to reflect a draw from the random effect distribution (which is assumed MVN here).
+Key concept: EB estimates are pulled towards the observations and are not expected to reflect the assumed random effect distribution
 ]
 
 ---

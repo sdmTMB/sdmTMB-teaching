@@ -86,11 +86,16 @@ fit <- sdmTMB(
 
 # Predict over the survey domain
 
+```{r, echo=FALSE}
+grid <- replicate_df(qcs_grid, "year", time_values = unique(pcod$year))
+```
+
 .small[
 ```{r pcod-st-index1, echo=TRUE, message=FALSE, warning=FALSE}
-grid <- replicate_df(qcs_grid, "year", time_values = unique(pcod$year))
 pred <- predict(
-  fit, newdata = grid, return_tmb_object = TRUE
+  fit, 
+  newdata = grid, #<<
+  return_tmb_object = TRUE #<<
 )
 select(pred$data, year, X, Y, est) |> 
   head()

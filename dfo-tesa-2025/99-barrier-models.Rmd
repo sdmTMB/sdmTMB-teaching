@@ -100,7 +100,9 @@ map_data <- rnaturalearth::ne_countries(
   scale = "large",
   returnclass = "sf"
 )
+```
 
+```{r echo=FALSE}
 # Fix invalid geometries before cropping
 map_data <- sf::st_make_valid(map_data)
 
