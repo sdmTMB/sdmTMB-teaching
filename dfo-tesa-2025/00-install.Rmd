@@ -5,7 +5,6 @@ title: sdmTMB setup on DFO computers
 1. Install the following programs (on DFO Windows laptops, using the 'Software Centre'):
 
 - R 4.5.1 (or 4.4 or higher)
-- Rtools 4.5 (if installing the development version below; or 4.4 to match R 4.4)
 - RStudio latest version (for DFO computers you need to search "R Studio" with a space)
 
 2. In R, install sdmTMB from CRAN
@@ -70,9 +69,19 @@ See ?tidy.sdmTMB to extract these values as a data frame.
 
 Again, you can ignore any warnings about Matrix/TMB versions if you see those.
 
-## Installing the development version of sdmTMB
+## Other packages
 
-Optional, but you can install development version of sdmTMB from GitHub. This requires a C++ compiler or the Rtools application on Windows.
+```{r}
+pkgs <- c("dplyr", "ggplot2", "sf", "inlabru", "purrr",
+  "future", "here", "knitr", "rnaturalearth", "fishMod")
+install.packages(pkgs)
+```
+
+## Optionally installing the development version of sdmTMB
+
+This is completely optional. If this is confusing or doesn't work, don't worry---the CRAN version is just fine!
+
+This requires a C++ compiler or the Rtools application on Windows. Install Rtools 4.5 from the Software Center.
 
 ```{r, eval=FALSE}
 pak::pak("pbs-assess/sdmTMB", dependencies = TRUE)
