@@ -1,8 +1,8 @@
 future::plan(future::multisession)
 options(future.rng.onMisuse = "ignore")
 
-PARALLEL <- F
-BUILD_RMD <- F
+PARALLEL <- T
+BUILD_RMD <- T
 BUILD_QMD <- T
 
 folder <- "dfo-tesa-2025"
