@@ -79,7 +79,7 @@ Presence/absence of Dungeness crabs:
 
 .small[
 ```{r load-crabs, echo=FALSE, fig.asp=0.5}
-crabs <- readRDS(here::here("noaa-psaw-2022/data/crabs.rds"))
+crabs <- readRDS(here::here("dfo-tesa-2025/data/crabs.rds"))
 crabs$present <- as.factor(crabs$crab)
 
 ggplot(crabs, aes(lon, lat, col = present)) +
@@ -100,6 +100,9 @@ map_data <- rnaturalearth::ne_countries(
   scale = "large",
   returnclass = "sf"
 )
+
+# Fix invalid geometries before cropping
+map_data <- sf::st_make_valid(map_data)
 
 puso <- suppressWarnings(suppressMessages(
   sf::st_crop(
@@ -137,7 +140,7 @@ ggplot(puso) + # coastline and data:
 .small[
 ```{r mesh, echo=TRUE, eval=TRUE}
 # Extract the coordinates:
-surv_utm_coords <- st_coordinates(survey)
+surv_utm_coords <- sf::st_coordinates(survey)
 
 # Scale coordinates to km so the range parameter
 # is on a reasonable scale for estimation:
@@ -168,7 +171,7 @@ Use `sdmTMB::add_barrier_mesh()` to add on barrier component.
 Choose a fraction of the range across physical barriers. Values of 0.1 or 0.2 seem to work well.
 
 ```{r barrier, echo=TRUE, eval=TRUE}
-barrier_mesh <- add_barrier_mesh(
+barrier_mesh <- sdmTMBextra::add_barrier_mesh(
   spde_obj = mesh,
   barrier_sf = puso,
   range_fraction = 0.1, #<<

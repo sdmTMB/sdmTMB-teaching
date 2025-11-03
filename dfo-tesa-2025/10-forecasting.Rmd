@@ -132,7 +132,7 @@ fit_rw_ar1 <- sdmTMB(
 .small[
 ```{r, fit-sm, echo=TRUE, eval=TRUE, results='hide'}
 fit_sm <- sdmTMB(
-  density ~ s(year) + depth_scaled + depth_scaled2, #<<
+  density ~ s(year, k = 5) + depth_scaled + depth_scaled2, #<<
   time = "year",
   extra_time = extra_years, #<<
   spatiotemporal = "AR1", #<<
@@ -192,7 +192,7 @@ ggplot(pred_df, aes(year, exp(est), ymin = exp(est - 2 * est_se), ymax = exp(est
 # AR(1) spatiotemporal fields evolve towards mean zero
 
 ```{r pred-ar1-plot-eps}
-one_yr <- dplyr::filter(qcs_grid, year == 2017)
+one_yr <- qcs_grid
 grid <- purrr::map_dfr(unique(fit_ar1$data$year), function(i) {
   one_yr$year <- i
   one_yr

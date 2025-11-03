@@ -148,12 +148,10 @@ fit
 ```{r resid1, echo=TRUE, out.width='500px', fig.width=5}
 set.seed(1)
 rq_res <- residuals(fit) # randomized quantile residuals
-qqnorm(rq_res);qqline(rq_res)
+qqnorm(rq_res);abline(0, 1)
 ```
 
 ---
-
-<!-- TODO: slides on other types of residuals -->
 
 # Model residuals in space
 

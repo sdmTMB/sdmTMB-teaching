@@ -84,7 +84,7 @@ dat$year_factor <- as.factor(dat$year)
 
 # Constructing a mesh
 
-We start by constructing an SPDE mesh with fmesher. This creates some matrices that are used internally when fitting the model. We will use the shortcut function `make_mesh()` and use a cutoff (minimum triangle length of 10 km). 
+We start by constructing an SPDE mesh with fmesher. This creates some matrices that are used internally when fitting the model. We will use the shortcut function `make_mesh()` and use a cutoff (minimum triangle length of 10 km).
 
 ```{r}
 mesh <- make_mesh(dat, xy_cols = c("X", "Y"), cutoff = 10)
@@ -102,7 +102,7 @@ ggplot() + inlabru::gg(mesh$mesh) + coord_fixed() +
 
 # Fitting a spatial model
 
-The most basic model we could fit would be a model with a single spatial random field, and no covariates. We fit that yesterday. Here, we will introduce a depth covariate. 
+The most basic model we could fit would be a model with a single spatial random field, and no covariates. We fit that yesterday. Here, we will introduce a depth covariate.
 
 Using `silent = FALSE` lets us see what is happening, but it's awkward when running code in Rmd/Quarto chunks (with the default RStudio setting to 'Show output inline for all R Markdown document') so we will comment it out in most cases here. But it is a good idea to use it if models are running slowly or not converging to monitor progress.
 
@@ -135,7 +135,7 @@ A refresher from yesterday:
 
 # Anisotropy and cross validation
 
-We can consider whether including anisotropy improves model predictions. This lets the correlation decay differently depending on direction. 
+We can consider whether including anisotropy improves model predictions. This lets the correlation decay differently depending on direction.
 
 First, let's fit out possible anisotropic model to make sure it can be estimated:
 
@@ -240,15 +240,15 @@ cv_results |>
 # Difference in sum log-likelihood with SE
 lpd_diff <- cv_anisotropic$sum_loglik - cv_isotropic$sum_loglik
 se_diff <- sqrt(8) * sd(cv_anisotropic$fold_loglik - cv_isotropic$fold_loglik)
-cat("LPD difference (anisotropic - isotropic):", round(elpd_diff, 2), "±", round(se_diff, 2), "\n")
+cat("LPD difference (anisotropic - isotropic):", round(lpd_diff, 2), "±", round(se_diff, 2), "\n")
 ```
 
 ### Exercise:
 
 1.  Which model does LPD suggest has better out-of-sample predictive performance?
 2.  How consistent is that result across folds?
-4.  We assigned folds. What happens if you don't do this? Why might you want to set the random seed first?
-5.  How else could you use the folds?
+3.  We assigned folds. What happens if you don't do this? Why might you want to set the random seed first?
+4.  How else could you use the folds?
 
 We won't dwell on this model here for the sake of time, but in practice we would stop, inspect, and understand this model before progressing to a spatiotemporal model.
 
@@ -653,4 +653,3 @@ sanity(fit2)
 fit2
 tidy(fit2, effects = "ran_pars", conf.int = TRUE)
 ```
-

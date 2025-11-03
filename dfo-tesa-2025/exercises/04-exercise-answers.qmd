@@ -52,12 +52,10 @@ We will run the following code to turn the `qcs_grid` grid built into the packag
 
 # Grid
 
+We'll expand the built-in survey grid to each year of our dataset:
+
 ```{r}
-grid <- filter(qcs_grid, year == min(qcs_grid$year)) |>
-  select(-year) |>
-  select(-depth_scaled, -depth_scaled2) |>
-  rename(depth_m = depth)
-grid <- purrr::map_dfr(unique(d$year), ~ tibble(grid, year = .x))
+grid <- replicate_df(qcs_grid, "year", unique(d$year))
 ```
 
 # Spatial model
@@ -161,7 +159,7 @@ Calculate randomized quantile residuals into an object `resid`:
 
 ```{r}
 set.seed(1)
-resid <- residuals(fit) # answer
+resid <- residuals(fit, type = "mle-mvn") # answer
 #resid <-  # exercise
 ```
 
@@ -169,7 +167,7 @@ How do the basic randomized quantile residuals look for the overall model?
 
 ```{r}
 qqnorm(resid)
-qqline(resid)
+abline(0, 1)
 ```
 
 Predict on the newdata `grid` and set `return_tmb_object = TRUE`. Save the output to `pred`:

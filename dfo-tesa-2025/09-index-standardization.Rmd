@@ -88,8 +88,9 @@ fit <- sdmTMB(
 
 .small[
 ```{r pcod-st-index1, echo=TRUE, message=FALSE, warning=FALSE}
+grid <- replicate_df(qcs_grid, "year", time_values = unique(pcod$year))
 pred <- predict(
-  fit, newdata = qcs_grid, return_tmb_object = TRUE
+  fit, newdata = grid, return_tmb_object = TRUE
 )
 select(pred$data, year, X, Y, est) |> 
   head()
@@ -152,4 +153,6 @@ There are *many* possible model-based indexes. Thankfully, results are often (bu
 
 .tiny[
 Commander, C.J.C, L.A.K. Barnett, E.J. Ward, S.C. Anderson, T.E. Essington. 2022. The shadow model: how and why small choices in spatially explicit species distribution models affect predictions. PeerJ. 10: e12783. <https://doi.org/10.7717/peerj.12783>
+
+Yalcin, S., Anderson, S.C., Regular, P.M., and English, P.A. 2023. Exploring the limits of spatiotemporal and design-based index standardization under reduced survey coverage. ICES Journal of Marine Science 80(9): 2368–2379. <https://doi.org/10.1093/icesjms/fsad155>
 ]

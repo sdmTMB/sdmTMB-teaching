@@ -15,3 +15,4 @@ libs/remark-latest.min.js
 dfo-tesa-2025/admin/TESA-sdmTMB-2025-Responses.xlsx
 dfo-tesa-2025/admin/TESA_sdmTMB-Course-Participants-0.xlsx
 dfo-tesa-2025/admin/TESA_sdmTMB-Course-Participants.xlsx
+*.rmarkdown
