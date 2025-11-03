@@ -68,23 +68,10 @@ Extra exercises to finish today:
 - integration
 - stitching
 
-
 - dropping (but could include)
 - barriers
 - priors
 - presence only
-
-
-# Topics to make sure we hit based on feedback:
-
-* Use with fisheries dependent data. Can we? With what caveats?
-* Use of environmental covariates
-* Use with tracking datasets?
-* Wrapping head around why we need the mesh + SPDE
-* Model diagnostics and validation
-* Integrating data types
-* Common problems when starting out
-* Is there likely a need for High Performance Computing with sdmTMB for fitting and/or simulation?
 
 # Changes to lectures and exercises
 
