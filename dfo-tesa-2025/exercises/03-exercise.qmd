@@ -11,7 +11,7 @@ execute:
 
 -   Practice fitting delta (hurdle) models.
 -   Understand how to inspect their more complicated model output.
--   Learn how to plot aspects of component models and their combined predictions.
+-   Learn how to look at, predict, and plot output from the two linear predictors
 -   Calculate an area-weighted biomass index and compare how model structure can impact an index.
 
 ```{r, message=FALSE, warning=FALSE}
@@ -213,8 +213,8 @@ ggplot(dat, aes(X, Y, colour = resid)) +
 
 ### Exercise
 
-1. Do these residuals represent the full model or just one linear predictor? 
-2. If just one, how would we look at the other linear predictor?
+1.  Do these residuals represent the full model or just one linear predictor?
+2.  If just one, how would we look at the other linear predictor?
 
 ## Checking simulation-based residuals
 
@@ -226,14 +226,13 @@ dharma_residuals(s, fit)
 
 ### Exercise
 
-1. What did we just do wrong here? Did we get a warning message? How does our QQ plot look?
+1.  What did we just do wrong here? Did we get a warning message? How does our QQ plot look?
 
 ```{r}
 set.seed(123)
 s <- simulate(fit, nsim = 300, type = "mle-mvn")
 dharma_residuals(s, fit)
 ```
-
 
 ## Covariate effects
 
