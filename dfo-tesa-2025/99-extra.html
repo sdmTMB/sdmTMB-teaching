@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Related packages, troubleshooting, Q+A, tips</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="" />
+    <script src="libs/header-attrs-2.30/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="theme.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Related packages, troubleshooting, Q+A, tips
+]
+.subtitle[
+## DFO TESA sdmTMB workshop
+]
+.author[
+### 
+]
+.date[
+### November 4–6 2025
+]
+
+---
+
+
+&lt;!-- Build with: xaringan::inf_mr() --&gt;
+
+
+
+
+
+# Getting help
+
+* sdmTMB GitHub repository:  
+  &lt;https://github.com/pbs-assess/sdmTMB&gt;
+  
+* sdmTMB documentation:  
+  &lt;https://pbs-assess.github.io/sdmTMB/index.html&gt;
+
+*  New features to suggest? Bugs?  
+  &lt;https://github.com/pbs-assess/sdmTMB/issues&gt;
+  
+*  Resources and reference material: 
+  &lt;https://github.com/pbs-assess/sdmTMB/wiki/resources&gt;
+
+---
+
+# Related modelling software
+
+.center[
+&lt;img src="images/table_comparison.png" width="550px" height = "500px"/&gt;
+]
+&lt;!-- --- --&gt;
+
+&lt;!-- # SPDE approach / INLA / etc; comparison with other software --&gt;
+
+&lt;!-- --- --&gt;
+
+&lt;!-- # Fitting basic spatial models in sdmTMB (Philina) --&gt;
+
+&lt;!-- * Making meshes … link to INLA tutorial (+interactive meshbuilder) --&gt;
+&lt;!-- * How do you know your model hasn’t converged? Who is Hessian and why hasn’t he converged? --&gt;
+&lt;!-- * What warnings do you need to worry about?  --&gt;
+&lt;!-- * Overall magnitude of errors / observation error etc.  --&gt;
+
+---
+
+# sdmTMB limitations
+
+sdmTMB fits a variety of models with univariate responses
+
+sdmTMB: 
+
+* does not fit multivariate models ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
+* does not conduct spatial (dynamic) factor analysis ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
+
+---
+
+class: center, middle, inverse
+
+# Troubleshooting
+
+---
+
+# Example of non-converging model
+
+.small[
+
+``` r
+mesh &lt;- make_mesh(pcod, xy_cols = c("X", "Y"), cutoff = 10)
+
+fit &lt;- sdmTMB(
+  present ~ depth * year,
+  data = pcod,
+  mesh = mesh,
+  family = binomial(link = "logit"),
+  spatial = "on"
+)
+```
+
+```r
+#&gt; Warning message:
+#&gt; The model may not have converged: 
+#&gt; non-positive-definite Hessian matrix. 
+```
+]
+---
+
+# Who is Hessian and why are they not "positive definite"?
+
+* A Hessian matrix is a matrix of second derivatives of a function (here the log likelihood surface)
+
+--
+
+* The inverse of the negative Hessian is the parameter covariance matrix
+
+--
+
+* Warning means the curvature of the log-likelihood surface is inconsistent with the model having found the best fit
+
+--
+
+* Overparameterized? Variance estimated near zero?
+
+--
+
+* See [vignette("troubleshooting", "glmmTMB")](https://cran.r-project.org/web/packages/glmmTMB/vignettes/troubleshooting.html)
+
+---
+
+# Inspecting output
+
+One or more standard errors being `NaN` is a problem:
+
+.small[
+
+``` r
+fit
+#&gt; Spatial model fit by ML ['sdmTMB']
+#&gt; Formula: present ~ depth * year
+#&gt; Mesh: mesh (isotropic covariance)
+#&gt; Data: pcod
+#&gt; Family: binomial(link = 'logit')
+
+NA
+NA
+NA
+*NA
+#&gt;  
+#&gt; Conditional model:
+#&gt;             coef.est coef.se
+#&gt; (Intercept)    41.66   24.32
+#&gt; depth           0.02    0.00
+#&gt; year           -0.02    0.01
+#&gt; depth:year      0.00     NaN
+#&gt; 
+#&gt; Matérn range: 37.06
+*#&gt; Spatial SD: 2.20
+#&gt; ML criterion at convergence: 1116.725
+#&gt; 
+#&gt; See ?tidy.sdmTMB to extract these values as a data frame.
+#&gt; 
+#&gt; **Possible issues detected! Check output of sanity().**
+```
+]
+
+---
+
+# Sanity
+
+* `NaN` checks alone can't diagnose all problems
+
+
+
+
+---
+
+# Inspecting output
+
+We could also look directly at output from TMB `TMB::sdreport()`:
+
+.small[
+
+``` r
+fit$sd_report
+#&gt; sdreport(.) result
+
+NA
+NA
+NA
+*NA
+NA
+NA
+*NA
+*NA
+*NA
+#&gt;               Estimate   Std. Error
+#&gt; b_j      41.6637790072 24.316746594
+#&gt; b_j       0.0234908458  0.002301342
+#&gt; b_j      -0.0186907733  0.012088203
+#&gt; b_j      -0.0000235797          NaN
+*#&gt; ln_tau_O  0.5202340996  0.153542812
+#&gt; ln_kappa -2.5728046206  0.088995040
+#&gt; Warning:
+*#&gt; Hessian of fixed effects was not positive definite.
+*#&gt; Maximum gradient component: 131.0776
+*
+```
+]
+
+---
+
+# Looking at gradients
+
+Log likelihood gradient with respect to fixed effects:
+
+.small[
+
+``` r
+max(fit$gradients)
+#&gt; [1] 0.0006414254
+```
+]
+
+* Gradient becomes smaller as likelihood surface becomes flatter at the location in parameter space
+
+--
+
+* Flatter surface = closer to point of maximum likelihood
+
+--
+
+* So, small values are consistent with convergence (no hard rule, perhaps at least &lt; 0.001)
+
+---
+
+# Interpretation
+
+* Linear interaction term seems tricky to estimate
+
+* Solutions:
+  * make sure the model is identifiable
+  * drop linear interaction (maybe not important)
+  * try re-scaling predictors
+  * try a different mesh setup
+  * simplify some other part of the model
+  * try a related fixed-effect structure, e.g., non-linear smooths
+  
+---
+
+# How do we fit smooth effects by year?
+
+For example, separate smooths by year:
+
+
+``` r
+pcod$fyear &lt;- as.factor(pcod$year)
+fit &lt;- sdmTMB(
+* present ~ s(depth, by = fyear),
+  data = pcod,
+  mesh = mesh,
+  family = binomial(link = "logit"),
+  spatial = "on"
+)
+```
+
+---
+
+# Can we use these models with fisheries dependent data?
+
+- "Theoretically" no, in practice, yes. See "preferential sampling".
+
+--
+
+- Several papers show these can work very well for commercial CPUE and better than alternatives
+
+--
+
+- Theoretically, if all covariates driving the preferential sampling (e.g., depth, location) the sampling bias problem is ameliorated
+
+--
+
+- If worried, simulate it, or attempt to account for the preferential sampling.
+
+---
+
+# Things to be aware of when using environmental covariates
+
+- Same principles apply with sdmTMB as any GLM/GLMM/GAM
+
+--
+
+- Ideally, use the same source for observations and grid, especially if or index standardization
+
+--
+
+- Covariates and random fields can compete to explain the same variance; can be seen a feature or a bug
+
+--
+
+- Don't be surprised if the fields explain a lot more variance than your fixed effects!
+
+---
+
+# Can sdmTMB be used with tracking data?
+
+- Only sort of
+
+--
+
+- Not while taking advantage of all the information in the data
+
+--
+
+- If tracking data is reduced, yes
+
+---
+
+# Help me wrap my head around why we need the mesh and SPDE again
+
+- Two things going on speed-wise: mesh and SPDE
+
+--
+
+- Mesh lets us work with (far) fewer random effects
+
+--
+
+- Mesh also gives us the matrices we need to do the SPDE math
+
+--
+
+- SPDE lets us work with the precision matrix instead of covariance matrix; avoids matrix inversion, much faster
+
+--
+
+- RTMB examples: [direct MVN Gaussian random field](https://github.com/seananderson/RTMB-TESA-spatial/blob/main/exercises/01-spatial-dmvnorm.R), [SPDE GMRF](https://github.com/seananderson/RTMB-TESA-spatial/blob/main/exercises/02-spatial-spde.R)
+
+---
+
+# What are common problems when starting out?
+
+- Analysis paralysis with all the options
+
+--
+
+- Using (or starting with) too fine of a mesh
+
+--
+
+- Designing a mesh that doesn't cover your whole prediction area
+
+--
+
+- SDs that collapse to zero + poorly estimated range parameters
+
+--
+
+- Using different environmental data when fitting and predicting
+
+---
+
+# When should I use VAST, sdmTMB, or tinyVAST?
+
+- `¯\_(ツ)_/¯`
+
+--
+
+- Timeline: SpatialDeltaGLMM, VAST, sdmTMB, tinyVAST
+
+--
+
+- Current actively developped packages: sdmTMB and tinyVAST
+
+--
+
+- If set up the same, VAST, sdmTMB, and tinyVAST can all fit *identical* models and have been extensively tested
+
+---
+
+## sdmTMB vs. tinyVAST (in my opinion!)
+
+.small[
+- Neither going anywhere soon; Jim and I work on both
+]
+
+--
+
+.small[
+- sdmTMB more user friendly, focusses on univariate responses
+]
+
+--
+
+.small[
+- sdmTMB has the most built-up set of functions for summarizing, checking, and working with the output
+]
+
+--
+
+.small[
+- sdmTMB can only fit "multivariate" responses if the fields are independent across categories
+]
+--
+
+.small[
+- tinyVAST focusses on multivariate responses but (of course) also does univariate responses
+]
+
+--
+
+.small[
+- Compared to VAST: adds structural equation and dynamic structural equation modelling
+]
+
+---
+
+### Is there likely a need for High Performance Computing with sdmTMB?
+
+- sdmTMB can do multicore likelihood calculations&lt;br&gt;`TMB::openmp(n=3, DLL="sdmTMB")`
+
+--
+
+- But it's not always faster!
+
+--
+
+- Memory can be an issue with larger datasets, and especially many (correlated) random effects (i.e., large meshes, AR1/random walks)
+
+--
+
+- For index standardization memory issues: &lt;br&gt;`?get_index_split`
+
+--
+
+- If fitting lots of models, absolutely!
+
+---
+
+# Words of wisdom
+
+**Start simple!**
+
+--
+
+These are complex models:
+
+--
+
+* May take a while to fit (`silent = FALSE`)
+
+--
+
+* Easy to create configurations that won't converge
+
+--
+
+* Can also be hard to wrap your head around
+
+---
+
+# Words of wisdom
+
+--
+
+Options for starting simple:
+
+--
+
+* Start intercept only
+
+--
+
+* Start with a spatial not spatiotemporal model
+
+--
+
+* Start without random fields:  
+  `spatial = 'off', spatiotemporal = 'off'`
+  
+--
+
+* Start with coarse meshes, maybe increase later  
+  .xsmall[Mesh resolution greatly impacts speed and finer is not always better; can affect convergence.]
+
+---
+
+# More words of wisdom
+
+
+--
+
+* Make lots of plots  
+  .xsmall[Plot the raw data, plot the predictions, plot the random fields, ...]
+
+--
+
+* Don't get too caught up in model configuration  
+  .xsmall[Many are only subtly different and can produce similar predictions]
+
+--
+
+* Consider the scale of the response and predictors
+  .xsmall[Keep parameters not too big or small]
+
+--
+
+* Consider if observation error variance &gt;&gt; process variance   
+  .xsmall[Known to be problematic for state-space models]
+  
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

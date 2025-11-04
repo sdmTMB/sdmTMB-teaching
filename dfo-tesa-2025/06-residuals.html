@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Residuals with sdmTMB</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="" />
+    <script src="libs/header-attrs-2.30/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="theme.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Residuals with sdmTMB
+]
+.subtitle[
+## DFO TESA sdmTMB workshop
+]
+.author[
+### 
+]
+.date[
+### November 4–6 2025
+]
+
+---
+
+
+&lt;!-- Build with: xaringan::inf_mr() --&gt;
+
+
+
+
+
+
+
+
+
+# Why look at residuals
+
+- Assess whether the model is probabilistically consistent with the data
+
+--
+
+- Check for remaining spatial or temporal structure
+
+--
+
+- Evaluate missing covariate effects
+
+--
+
+- Detect over- or under- dispersion (from simulated observations)
+
+--
+
+- Assess zero inflation (from simulated observations)
+
+---
+
+# Good residuals, bad model
+
+Residuals can only tell us whether the model is probabilistically consistent with the data or if we're ignoring major structural elements.
+
+They don't tell us whether the model is any good at prediction!
+
+---
+
+# Types of residuals in sdmTMB
+
+- *Many*, see `?residuals.sdmTMB`
+
+--
+
+- Most useful: "randomized quantile" (RQR) (Dunn &amp; Smyth 1996)
+- Sometimes called "probability integral transform" (PIT) residuals (Smith 1985).
+  
+.tiny[
+Dunn, P.K. &amp; Smyth, G.K. (1996). Randomized Quantile Residuals. Journal of Computational and Graphical Statistics, 5, 236–244.
+
+Smith, J.Q. (1985). Diagnostic checks of non-standard time series models. Journal of Forecasting, 4, 283–291.
+]
+
+---
+
+# Why use *randomized quantile residuals*?
+
+Because they let us work with residuals that are expected to be:
+
+- standard normal, N(0, 1)
+- or uniform, U(0, 1)
+
+(take your pick!)
+
+regardless of the distribution family we work with.
+
+---
+
+# What does *randomized quantile* mean?
+
+**Quantile**: Where does each observed value fall in its predicted distribution?
+
+**Randomized**: Add randomization for any discrete data
+
+E.g., for the gamma:
+
+```r
+u &lt;- pgamma(q = y, shape = s1, scale = s2)
+qnorm(u)
+```
+
+where `y`, are the observations and `s1` and `s2` are estimated in the model.
+  
+---
+
+# What does *randomized quantile* mean?
+
+**Quantile**: Where does each observed value fall in its predicted distribution?
+
+**Randomized**: Add randomization for any discrete data
+
+E.g., for the Poisson:
+
+```r
+a &lt;- ppois(y - 1, mu)
+b &lt;- ppois(y, mu)
+u &lt;- runif(n = length(y), min = a, max = b)
+qnorm(u)
+```
+
+where the `runif()` adds randomization.
+
+.tiny[
+See the [residuals vignette](https://pbs-assess.github.io/sdmTMB/articles/residual-checking.html) that expands on this.]
+
+---
+
+# Decisions within the type of residuals
+
+1. How do we treat the fixed and random effects?
+
+--
+
+2. Do we use theoretical or simulation-based quantiles
+
+---
+
+# Fixed and random effects
+
+*Many* options, useful ones to consider:
+
+Hold fixed effects at their maximum likelihood estimates (MLEs)
+
+Set random effects to one of:
+  - Empirical Bayes estimates *(weird)*
+  - One sample drawn from their precision matrix *(good enough, fast)*
+  - One sample drawn from an MCMC chain *(great, slow)*
+
+---
+
+# An aside on empirical Bayes
+
+.small[
+What the heck is an empirical Bayes (EB) random effect!?
+]
+
+--
+
+.small[
+Find fixed effects that maximize the marginal log likelihood.
+]
+
+--
+
+.small[
+Hold the fixed effects at these MLEs.
+]
+
+--
+
+.small[
+Now use an optimizer to find the random effects that maximize the likelihood.
+]
+
+--
+
+.small[
+These are what you're used to getting out of lme4, mgcv, glmmTMB, sdmTMB, etc.!
+]
+
+--
+
+.small[
+Key concept: EB estimates are pulled towards the observations and are not expected to reflect the assumed random effect distribution
+]
+
+---
+
+# MLE-EB residuals gone wrong
+
+
+
+
+``` r
+r1 &lt;- residuals(fit, type = "mle-eb")
+qqnorm(r1);abline(0, 1)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-4-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# MLE-MVN residuals gone right
+
+
+
+
+``` r
+r2 &lt;- residuals(fit, type = "mle-mvn")
+qqnorm(r2);abline(0, 1)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-6-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Theoretical vs. simulation-based quantiles
+
+Do we answer the question "Where does each observed value fall in its predicted distribution?" by
+
+1. Using the theoretical CDF function, e.g., `pnorm()`, `pgamma()`, or
+
+--
+
+2. Simulating each observation many times and calculating the proportion of times our simulated values are `\(\le\)` the observation.
+
+---
+
+# Theoretical vs. simulation-based residual tradeoffs
+
+- In sdmTMB, the theoretical RQRs are N(0, 1)
+
+--
+
+- In DHARMa, the simulation-based RQRs are U(0, 1)
+
+--
+
+- We haven't worked out the theoretical RQRs for all distributions or for delta models
+
+--
+
+- Simulation-based RQRs are stochastic (so set a seed and take enough draws)
+
+---
+
+# Normal(0, 1) vs. Uniform(0, 1)
+
+Residuals from a perfectly matched model:
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-7-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Theoretical RQRs in sdmTMB
+
+
+``` r
+r &lt;- residuals(fit, type = "mle-mvn")
+qqnorm(r)
+abline(0, 1)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-9-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Simulation-based RSRs in sdmTMB
+
+
+``` r
+s &lt;- simulate(fit, nsim = 200, type = "mle-mvn")
+dharma_residuals(s, fit)
+
+# or use the pipe:
+
+simulate(fit, nsim = 200, type = "mle-mvn") |&gt;
+  dharma_residuals(fit)
+
+# or return the DHARMa object itself:
+
+simulate(fit, nsim = 200, type = "mle-mvn") |&gt;
+  dharma_residuals(fit, return_DHARMa = TRUE)
+```
+
+Note the `type = "mle-mvn"`!
+
+---
+
+# Other things you can do with DHARMa simulations
+
+Check for zero inflation:
+
+
+
+
+``` r
+s &lt;- simulate(fit, nsim = 200, type = "mle-mvn")
+mean(s == 0)
+#&gt; [1] 0.515095
+mean(dat$observed == 0)
+#&gt; [1] 0.527
+```
+
+---
+
+# Other things you can do with DHARMa simulations
+
+Check for zero inflation:
+
+
+``` r
+dharma &lt;- simulate(fit, nsim = 200, type = "mle-mvn") |&gt;
+  dharma_residuals(fit, return_DHARMa = TRUE)
+DHARMa::testZeroInflation(dharma)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Other things you can do with DHARMa simulations
+
+Check for overdispersion:
+
+
+``` r
+DHARMa::testOverdispersion(dharma)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-14-1.png" width="65%" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Other things you can do with DHARMa simulations
+
+Check for spatial correlation:
+
+.xsmall[
+
+``` r
+DHARMa::testSpatialAutocorrelation(dharma, x = dat$X, y = dat$Y)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-15-1.png" width="65%" style="display: block; margin: auto;" /&gt;
+]
+
+---
+
+# Other things you can do with DHARMa simulations
+
+Check for missing covariates:
+
+
+``` r
+DHARMa::plotResiduals(dharma, form = dat$a1)
+```
+
+&lt;img src="06-residuals_files/figure-html/unnamed-chunk-16-1.png" width="65%" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Overall messages
+
+- Look at residuals and model simulation output
+
+--
+
+- Don't take the p-values or small deviations too seriously; look for broad deviations
+
+--
+
+- N(0, 1) residuals emphasize tail behaviour more than U(0, 1)
+
+--
+
+- Residuals are good for more than QQ plots
+
+--
+
+- Probably use `type = mle-mvn`
+
+--
+
+- Simulation-based residuals are available for all models in sdmTMB
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

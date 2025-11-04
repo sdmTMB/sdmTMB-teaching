@@ -8,6 +8,7 @@ BUILD_QMD <- T
 folder <- "dfo-tesa-2025"
 files <- list.files(folder, pattern = "\\.Rmd$")
 files <- gsub("\\.Rmd$", "", files)
+pwd <- getwd()
 
 # files <- files[!grepl("^99", files)]
 files
@@ -106,3 +107,7 @@ purrr::walk(rmarkdown_files, function(.x) {
   cat("Removing:", .x, "\n")
   rm(.x)
 })
+
+setwd(folder)
+system("./optimize-pngs.sh 6")
+setwd(pwd)

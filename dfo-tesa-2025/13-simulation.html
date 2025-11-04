@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Simulation with sdmTMB</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="" />
+    <script src="libs/header-attrs-2.30/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="theme.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Simulation with sdmTMB
+]
+.subtitle[
+## DFO TESA sdmTMB workshop
+]
+.author[
+### 
+]
+.date[
+### November 4–6 2025
+]
+
+---
+
+
+&lt;!-- Build with: xaringan::inf_mr() --&gt;
+
+
+
+
+
+# Useful things to do with sdmTMB simulation
+
+- Survey design
+
+- Evaluation model distributional assumptions
+
+- Evaluating the ability to estimate quantities / model bias
+
+- To understand how a model behaves
+
+---
+
+# Decisions when simulating from a fitted model
+
+Fixed effects: fixed (MLE), MVN draw, MCMC draw
+
+Random effects: 
+
+- empirical Bayes (EB) estimates, MVN draw, MCMC draw *from the precision matrix*
+
+- draw from a new random field based on the estimated "hyper" parameters (e.g. SD and range)
+
+---
+
+# Do I want to draw from the precision matrix?
+
+.small[
+Do I want my spatial "wiggles" to reflect my fitted system?
+ - If yes: draw from the precision matrix
+]
+
+--
+
+.small[
+Do I want entirely new "wiggles" that just have the same properties (same variance and same rate of correlation decay)?
+ - If yes: simulate new GMRFs
+ ]
+ 
+--
+
+.small[
+Do I want to ensure I have simulated data that can be recovered without any bias in ideal conditions?
+ - If yes: simulate new GMRFs
+]
+
+---
+
+# `simulate.sdmTMB()` vs. `sdmTMB_simulate()` !?
+
+`simulate.sdmTMB()`: simulate from an already fitted model
+
+`sdmTMB_simulate()`: simulate data from scratch; may be renamed `simulate_new()`.
+
+The lines blur: you can take estimates from a fitted model and feed them to `sdmTMB_simulate()`.
+
+---
+
+class: center, middle, inverse
+
+# Examples
+
+---
+
+# Examples
+
+`simulate.sdmTMB()` by default only simulates new observation error and 1 draw:
+
+
+``` r
+simulate(fit)
+simulate(fit, nsim = 100)
+```
+
+---
+
+# Examples
+
+Simulating with entirely new random effects based on the estimated SDs and ranges:
+
+
+``` r
+simulate(fit, re_form = NA)
+```
+
+---
+
+# Examples
+
+Simulating with a new draw of random effects for each iteration:
+
+
+``` r
+simulate(
+  fit, 
+* type = "mle-mvn",
+* mle_mvn_samples = "multiple",
+  nsim = 100
+)
+```
+
+---
+
+# Examples
+
+Simulating from a fitted model and refitting to it
+
+
+``` r
+fit &lt;- sdmTMB(y ~ 1, ..., data = dat)
+
+*dat$y_sim &lt;- simulate(fit, type = "mle-mvn")
+
+fit2 &lt;- sdmTMB(y_sim ~ 1, ..., data = dat)
+```
+
+---
+
+# Examples
+
+Simulating new random fields based on the estimated field properties
+
+
+``` r
+fit &lt;- sdmTMB(...)
+
+*dat$y_sim &lt;- simulate(fit, re_form = NA)
+
+fit2 &lt;- sdmTMB(y_sim ~ 1, ..., data = dat)
+
+# repeat in a loop and assess bias in parameters etc.
+```
+
+---
+
+# Examples
+
+.xsmall[
+Simulate from a fitted model to assess whether your model is probabilistically consistent with the observations.
+]
+
+
+
+.small[
+
+``` r
+*s &lt;- simulate(fit, nsim = 100)
+prop_zeros &lt;- apply(s, 2, \(x) mean(x == 0))
+hist(prop_zeros)
+abline(v = obs_prop_zero, col = "red", lwd = 2)
+```
+
+&lt;img src="13-simulation_files/figure-html/unnamed-chunk-7-1.png" width="60%" style="display: block; margin: auto;" /&gt;
+]
+
+---
+
+# Examples
+
+Use `newdata` in `sdmTMB.simulate()` to simulate new observations. E.g., to compare survey designs.
+
+
+``` r
+fit &lt;- sdmTMB(...)
+
+# new = new survey locations
+new$y_sim &lt;- simulate(fit, newdata = new, ...)
+
+fit_sim &lt;- sdmTMB(y_sim ~ ..., data = new)
+
+p &lt;- predict(fit_sim, ...)
+
+get_index(p)1
+
+# compare against known truth
+# (simulate on your survey grid) and repeat
+```
+
+
+---
+
+# Examples
+
+Feeding in random effects from a fitted model to `sdmTMB_simulate()`.
+
+
+``` r
+fit &lt;- sdmTMB(...)
+omega &lt;- get_pars(fit)$omega_s
+sdmTMB_simulate(
+  ~ depth, 
+  data = data, 
+* fixed_re = list(omega_s = omega)
+)
+```
+
+---
+
+# Examples
+
+.xsmall[
+Check simulations conditioned on a model as a graphical "Turing test". Can you, or a colleague, or a reviewer distinguish which panel is real?
+]
+
+.center[
+&lt;img src="images/coastwide-posterior-predictive-sims-slides-spiny.png" width="280px"/&gt;
+]
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

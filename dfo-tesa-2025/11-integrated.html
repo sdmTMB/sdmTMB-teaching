@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Data integration</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="" />
+    <script src="libs/header-attrs-2.30/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="theme.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Data integration
+]
+.subtitle[
+## DFO TESA sdmTMB workshop
+]
+.author[
+### 
+]
+.date[
+### November 4–6 2025
+]
+
+---
+
+
+&lt;!-- Build with: xaringan::inf_mr() --&gt;
+
+
+
+
+
+# Data integration
+
+Employing multiple data sources in the same population, stock assessment, or species distribution model.
+
+--
+
+Also known as "data fusion" or "integrated analysis".
+
+--
+
+Different data sources could be 
+.small[
+- multiple surveys of the same kind
+- surveys with different gear
+- commercial CPUE
+- different data "types" (e.g., presence-absence with count data)
+]
+
+.tiny[
+[Grüss et al. (2025) Fisheries Research](https://doi.org/10.1016/j.fishres.2025.107321)
+]
+
+---
+
+# Types of data integration
+
+Spatial domain: same domain vs. "expanded domain"
+
+Catchability: equal, constant difference, spatially varying
+
+Any combination of these!
+
+With (or sometimes without) comparative fishing
+
+.tiny[
+[Grüss et al. (2025) Fisheries Research](https://doi.org/10.1016/j.fishres.2025.107321)
+]
+
+---
+
+# Expanded domain
+
+Examples:
+
+Two surveys or more bienniel surveys run by one agency together covering a coastline (e.g., BC groundfish surveys)
+
+Two or more surveys run by neighbouring agencies with somewhat different gear but enough spatiotemporal proximity
+
+---
+
+# Expanded domain example
+
+.small[BC groundfish surveys: same gear, bienniel sampling design (don't do this!)]
+
+.center[
+&lt;img src="images/bc-gf-maps.png" width="700px"/&gt;
+]
+
+.tiny[[Anderson et al. annual Pacific groundfish synopsis reports](https://github.com/pbs-assess/gfsynopsis)]
+
+---
+
+# Expanded domain example
+
+.small[BC groundfish surveys: same gear, bienniel sampling design]
+
+.center[
+&lt;img src="images/bc-index-gfs.png" width="400px"/&gt;
+]
+
+.tiny[[Anderson et al. annual Pacific groundfish synopsis reports](https://github.com/pbs-assess/gfsynopsis)]
+
+---
+
+# Expanded domain example
+
+.small[Northeast Pacific Ocean Pacific Spiny Dogfish:&lt;br&gt;NOAA + DFO trawl surveys]
+
+.center[
+&lt;img src="images/dogfish-map.png" width="430px"/&gt;
+]
+
+.tiny[[Davidson et al. 2025. In press at Fish and Fisheries](https://doi.org/10.32942/X2V64Z)]
+
+---
+
+class: center, middle, inverse
+
+# Why data integration?
+
+---
+
+# Why data integration?
+
+.small[
+Model a species over a larger range (e.g., for transboundry distribution shift metrics, better estimates of environmental covariates of distribution)
+]
+
+--
+
+.small[
+Can make use of available data with often more accurate and precise distribution predictions
+]
+
+--
+
+.small[
+For single synthetic population indices:
+- Assessment models aren't usually equipped to combine spatial data
+- Often statistically convenient
+- Sometimes necessary when designing management procedures
+- Fish Stocks provisions "one stock, one LRP" guidance
+]
+
+---
+
+class: center, middle, inverse
+
+# How do we do data integration?
+
+---
+
+# Regression discontinuity design (RDD)
+
+The ability to integrate data, especially in an expanded domain context depends on the concept of regression discontinuity design.
+
+&lt;img src="11-integrated_files/figure-html/unnamed-chunk-1-1.png" width="70%" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Ways of accounting for catchability
+
+Constant catchability coefficient
+
+
+``` r
+formula = catch ~ factor(year) + 
+* factor(gear)
+```
+
+Spatially varying catchability coefficient
+
+
+``` r
+formula = catch ~ factor(year) + 
+* factor(gear),
+*spatial_varying = ~ factor(gear)
+```
+
+Mind what your base gear factor level is
+
+---
+
+# Different likelihoods
+
+Data integration can be with the same or different likelihoods.
+
+Examples:
+
+**Same**: two surveys that collect catch weight (e.g., delta-Gamma or Tweedie)
+
+**Different**: catch count (Poisson) + presence-absence (Bernoulli with clogog link)
+
+---
+
+# Combining all continuous positive, count, and 0-1 data (😲)
+
+.small[
+Idea: there's an underlying surface of fish population intensity. You observe it as one of:&lt;br&gt;- weight, count, presence/absence
+]
+
+.small[
+Internally, share linear predictors, convert into different observation likelihoods.
+]
+
+--
+
+.small[
+Key concepts:
+- a cloglog linked Bernoulli can be thought of as a "thinned" observation of a count process
+- a Poisson-link delta model has an underlying "count" model and a weight per "count"
+]
+
+---
+
+class: center, middle, inverse
+
+# Food for thought on data integration
+
+---
+
+# Deciding whether you should combine data
+
+.small[
+Do they represent the same population?
+]
+
+--
+
+.small[
+Are the selectivities similar enough, if you're not controlling for it?
+]
+
+--
+
+.small[
+Do the datasets give a similar impression on their own?
+]
+
+--
+
+.small[
+Does it help or hinder your stock assessment to create an integrated index?
+]
+
+--
+
+.small[
+Does a secondary data source substantially change parameter estimates from those of a trusted data source? ([Rufener et al. 2021 Ecol. Appl.](https://onlinelibrary.wiley.com/doi/abs/10.1002/eap.2453)).
+]
+
+---
+
+# Caveats
+
+Unless fish length interacts with catchability, you're assuming matching length selectivity
+
+--
+
+Expanded domain models can go awry in practice!
+
+--
+
+There may be good reasons to not integrate two datasets
+
+--
+
+This is pretty new in the fisheries world
+
+--
+
+Using different likelihoods per row of data isn't merged into the main branch of sdmTMB yet, but should be soon. It's possible in tinyVAST.
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
