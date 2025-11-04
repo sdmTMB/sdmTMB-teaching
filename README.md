@@ -2,7 +2,7 @@
 
 Links to material from workshops on sdmTMB.
 
-[November 4-6 2025: DFO TESA, slides and exercises](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/)
+November 4-6 2025: DFO TESA: see <https://github.com/pbs-assess/sdmTMB-TESA-2025>
 
 [March 23-25, 2023 slides](https://pbs-assess.github.io/sdmTMB-teaching/imr-2023/)
 
