@@ -40,37 +40,6 @@ library(sdmTMB)
 
 ---
 
-# Related modelling software
-
-.center[
-<img src="images/table_comparison.png" width="550px" height = "500px"/>
-]
-<!-- --- -->
-
-<!-- # SPDE approach / INLA / etc; comparison with other software -->
-
-<!-- --- -->
-
-<!-- # Fitting basic spatial models in sdmTMB (Philina) -->
-
-<!-- * Making meshes … link to INLA tutorial (+interactive meshbuilder) -->
-<!-- * How do you know your model hasn’t converged? Who is Hessian and why hasn’t he converged? -->
-<!-- * What warnings do you need to worry about?  -->
-<!-- * Overall magnitude of errors / observation error etc.  -->
-
----
-
-# sdmTMB limitations
-
-sdmTMB fits a variety of models with univariate responses
-
-sdmTMB: 
-
-* does not fit multivariate models ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
-* does not conduct spatial (dynamic) factor analysis ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
-
----
-
 class: center, middle, inverse
 
 # Troubleshooting
@@ -126,9 +95,9 @@ fit <- sdmTMB(
 
 One or more standard errors being `NaN` is a problem:
 
-.small[
-```{r, echo=TRUE, highlight.output=10}
-fit
+.xsmall[
+```{r, echo=TRUE}
+print(fit)
 ```
 ]
 
@@ -136,9 +105,7 @@ fit
 
 # Sanity
 
-* `NaN` checks alone can't diagnose all problems
-
-```{r checksanity, eval=FALSE}
+```{r checksanity, eval=TRUE, echo=TRUE, message=TRUE}
 sanity(fit)
 ```
 
@@ -150,7 +117,7 @@ sanity(fit)
 We could also look directly at output from TMB `TMB::sdreport()`:
 
 .small[
-```{r, echo=TRUE, highlight.output=c(6, 9, 10, 11)}
+```{r, echo=TRUE}
 fit$sd_report
 ```
 ]
@@ -167,7 +134,7 @@ max(fit$gradients)
 ```
 ]
 
-* Gradient becomes smaller as likelihood surface becomes flatter at the location in parameter space
+* Gradient becomes smaller as the log likelihood surface becomes flatter at the location in parameter space
 
 --
 
@@ -184,12 +151,13 @@ max(fit$gradients)
 * Linear interaction term seems tricky to estimate
 
 * Solutions:
-  * make sure the model is identifiable
+  * make sure the model is identifiable! e.g., try `glm()` and think about it
   * drop linear interaction (maybe not important)
   * try re-scaling predictors
   * try a different mesh setup
   * simplify some other part of the model
   * try a related fixed-effect structure, e.g., non-linear smooths
+  * try priors
   
 ---
 
@@ -212,7 +180,7 @@ fit <- sdmTMB(
 
 # Can we use these models with fisheries dependent data?
 
-- "Theoretically" no, in practice, yes. See "preferential sampling".
+- Theoretically no, in practice, yes. See "preferential sampling" literature
 
 --
 
@@ -304,6 +272,28 @@ fit <- sdmTMB(
 
 ---
 
+# Common problems continued
+
+- Not converting the prediction grid and data into the same projection
+
+--
+
+- Missing covariates in the prediction grid
+
+--
+
+- Using a prediction grid that does not overlap your observations by mistake
+
+---
+
+# Related modelling software
+
+.center[
+<img src="images/table_comparison.png" width="550px" height = "500px"/>
+]
+
+---
+
 # When should I use VAST, sdmTMB, or tinyVAST?
 
 - `¯\_(ツ)_/¯`
@@ -381,6 +371,16 @@ fit <- sdmTMB(
 
 ---
 
+# Is there anything computationally I can do to speed up my models?
+
+Yes! Especially for correlated random fields with large meshes.
+
+See the "OpenBLAS" installation instructions on the main sdmTMB README.md page:
+
+<https://github.com/pbs-assess/sdmTMB>
+
+---
+
 # Words of wisdom
 
 **Start simple!**
@@ -430,7 +430,6 @@ Options for starting simple:
 ---
 
 # More words of wisdom
-
 
 --
 

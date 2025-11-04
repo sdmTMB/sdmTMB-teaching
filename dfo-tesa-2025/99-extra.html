@@ -50,37 +50,6 @@ class: center, middle, inverse, title-slide
 
 ---
 
-# Related modelling software
-
-.center[
-&lt;img src="images/table_comparison.png" width="550px" height = "500px"/&gt;
-]
-&lt;!-- --- --&gt;
-
-&lt;!-- # SPDE approach / INLA / etc; comparison with other software --&gt;
-
-&lt;!-- --- --&gt;
-
-&lt;!-- # Fitting basic spatial models in sdmTMB (Philina) --&gt;
-
-&lt;!-- * Making meshes … link to INLA tutorial (+interactive meshbuilder) --&gt;
-&lt;!-- * How do you know your model hasn’t converged? Who is Hessian and why hasn’t he converged? --&gt;
-&lt;!-- * What warnings do you need to worry about?  --&gt;
-&lt;!-- * Overall magnitude of errors / observation error etc.  --&gt;
-
----
-
-# sdmTMB limitations
-
-sdmTMB fits a variety of models with univariate responses
-
-sdmTMB: 
-
-* does not fit multivariate models ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
-* does not conduct spatial (dynamic) factor analysis ([see VAST](https://github.com/James-Thorson-NOAA/VAST))
-
----
-
 class: center, middle, inverse
 
 # Troubleshooting
@@ -137,20 +106,15 @@ fit &lt;- sdmTMB(
 
 One or more standard errors being `NaN` is a problem:
 
-.small[
+.xsmall[
 
 ``` r
-fit
+print(fit)
 #&gt; Spatial model fit by ML ['sdmTMB']
 #&gt; Formula: present ~ depth * year
 #&gt; Mesh: mesh (isotropic covariance)
 #&gt; Data: pcod
 #&gt; Family: binomial(link = 'logit')
-
-NA
-NA
-NA
-*NA
 #&gt;  
 #&gt; Conditional model:
 #&gt;             coef.est coef.se
@@ -160,7 +124,7 @@ NA
 #&gt; depth:year      0.00     NaN
 #&gt; 
 #&gt; Matérn range: 37.06
-*#&gt; Spatial SD: 2.20
+#&gt; Spatial SD: 2.20
 #&gt; ML criterion at convergence: 1116.725
 #&gt; 
 #&gt; See ?tidy.sdmTMB to extract these values as a data frame.
@@ -173,9 +137,25 @@ NA
 
 # Sanity
 
-* `NaN` checks alone can't diagnose all problems
 
-
+``` r
+sanity(fit)
+#&gt; ✔ Non-linear minimizer suggests successful convergence
+#&gt; ✖ Non-positive-definite Hessian matrix: model may not have converged
+#&gt; ℹ Try simplifying the model, adjusting the mesh, or adding priors
+#&gt; ✔ No extreme or very small eigenvalues detected
+#&gt; ✖ `b_j` gradient &gt; 0.001
+#&gt; ℹ See ?run_extra_optimization(), standardize covariates, and/or simplify the model
+#&gt; ✖ `b_j` gradient &gt; 0.001
+#&gt; ℹ See ?run_extra_optimization(), standardize covariates, and/or simplify the model
+#&gt; ✖ `b_j` gradient &gt; 0.001
+#&gt; ℹ See ?run_extra_optimization(), standardize covariates, and/or simplify the model
+#&gt; ✔ No fixed-effect standard errors are NA
+#&gt; ✔ No standard errors look unreasonably large
+#&gt; ✔ No sigma parameters are &lt; 0.01
+#&gt; ✔ No sigma parameters are &gt; 100
+#&gt; ✔ Range parameter doesn't look unreasonably large
+```
 
 
 ---
@@ -189,27 +169,16 @@ We could also look directly at output from TMB `TMB::sdreport()`:
 ``` r
 fit$sd_report
 #&gt; sdreport(.) result
-
-NA
-NA
-NA
-*NA
-NA
-NA
-*NA
-*NA
-*NA
 #&gt;               Estimate   Std. Error
 #&gt; b_j      41.6637790072 24.316746594
 #&gt; b_j       0.0234908458  0.002301342
 #&gt; b_j      -0.0186907733  0.012088203
 #&gt; b_j      -0.0000235797          NaN
-*#&gt; ln_tau_O  0.5202340996  0.153542812
+#&gt; ln_tau_O  0.5202340996  0.153542812
 #&gt; ln_kappa -2.5728046206  0.088995040
 #&gt; Warning:
-*#&gt; Hessian of fixed effects was not positive definite.
-*#&gt; Maximum gradient component: 131.0776
-*
+#&gt; Hessian of fixed effects was not positive definite.
+#&gt; Maximum gradient component: 131.0776
 ```
 ]
 
@@ -227,7 +196,7 @@ max(fit$gradients)
 ```
 ]
 
-* Gradient becomes smaller as likelihood surface becomes flatter at the location in parameter space
+* Gradient becomes smaller as the log likelihood surface becomes flatter at the location in parameter space
 
 --
 
@@ -244,12 +213,13 @@ max(fit$gradients)
 * Linear interaction term seems tricky to estimate
 
 * Solutions:
-  * make sure the model is identifiable
+  * make sure the model is identifiable! e.g., try `glm()` and think about it
   * drop linear interaction (maybe not important)
   * try re-scaling predictors
   * try a different mesh setup
   * simplify some other part of the model
   * try a related fixed-effect structure, e.g., non-linear smooths
+  * try priors
   
 ---
 
@@ -273,7 +243,7 @@ fit &lt;- sdmTMB(
 
 # Can we use these models with fisheries dependent data?
 
-- "Theoretically" no, in practice, yes. See "preferential sampling".
+- Theoretically no, in practice, yes. See "preferential sampling" literature
 
 --
 
@@ -365,6 +335,28 @@ fit &lt;- sdmTMB(
 
 ---
 
+# Common problems continued
+
+- Not converting the prediction grid and data into the same projection
+
+--
+
+- Missing covariates in the prediction grid
+
+--
+
+- Using a prediction grid that does not overlap your observations by mistake
+
+---
+
+# Related modelling software
+
+.center[
+&lt;img src="images/table_comparison.png" width="550px" height = "500px"/&gt;
+]
+
+---
+
 # When should I use VAST, sdmTMB, or tinyVAST?
 
 - `¯\_(ツ)_/¯`
@@ -442,6 +434,16 @@ fit &lt;- sdmTMB(
 
 ---
 
+# Is there anything computationally I can do to speed up my models?
+
+Yes! Especially for correlated random fields with large meshes.
+
+See the "OpenBLAS" installation instructions on the main sdmTMB README.md page:
+
+&lt;https://github.com/pbs-assess/sdmTMB&gt;
+
+---
+
 # Words of wisdom
 
 **Start simple!**
@@ -491,7 +493,6 @@ Options for starting simple:
 ---
 
 # More words of wisdom
-
 
 --
 
