@@ -9,14 +9,14 @@ folder <- "dfo-tesa-2025"
 files <- list.files(folder, pattern = "\\.Rmd$")
 files <- gsub("\\.Rmd$", "", files)
 
-files <- files[!grepl("^99", files)]
+# files <- files[!grepl("^99", files)]
 files
 
 # Add .qmd files from exercises/ folder that start with "0"
 qmd_files <- list.files(file.path(folder, "exercises"), pattern = "^0.*\\.qmd$")
 qmd_files <- gsub("\\.qmd$", "", qmd_files)
 qmd_files <- file.path("exercises", qmd_files)
-qmd_files <- qmd_files[!grepl("04-exercise$", qmd_files)]
+qmd_files <- qmd_files[!grepl("05-exercise-troubleshooting$", qmd_files)]
 qmd_files
 
 rm <- function(x) if (file.exists(x)) file.remove(x)
