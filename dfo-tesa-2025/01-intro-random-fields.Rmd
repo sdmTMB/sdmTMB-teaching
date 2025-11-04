@@ -495,68 +495,6 @@ Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussia
 
 ---
 
-# Predictive process models
-
-* Estimate spatial field as random effects
-
---
-
-* High dimensional datasets computationally challenging
-
---
-
-* Gaussian process predictive process models:
-  * Estimate values at a subset of locations in the time series
-  *   'knots', 'vertices', or 'control points'
-  * Use covariance function to interpolate from knots to locations of observations
-
----
-
-# Predictive process models
-
-* More knots (vertical dashed lines) = more wiggliness & parameters to estimate
-
-```{r show-gp, fig.height=4}
-x <- seq(1, 50)
-d <- as.matrix(dist(x, diag = TRUE))
-set.seed(123)
-df <- data.frame(
-  x = x,
-  true = c(spam::rmvnorm(1, mu = 0, Sigma = 1 * exp(-0.05 * d)))
-)
-df$y <- rnorm(df$true, df$true, 0.1)
-
-f1 <- mgcv::gam(y ~ s(x, k = 25, bs = "bs"), data = df)
-
-knots <- data.frame("x" = f1$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
-g1 <- ggplot(df, aes(x, y)) +
-  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
-  geom_point(col = "red", alpha = 0.7) +
-  theme(panel.grid = element_blank()) +
-  xlab("") +
-  ylab("Observations") +
-  geom_smooth(
-    method = "gam",
-    formula = y ~ s(x, bs = "bs", k = 25)
-  ) +
-  coord_cartesian(xlim = c(0, 50))
-
-f2 <- mgcv::gam(y ~ s(x, k = 7, bs = "bs"), data = df)
-knots <- data.frame("x" = f2$smooth[[1]]$knots, ymin = 0, ymax = 1.0e10)
-
-g2 <- ggplot(df, aes(x, y)) +
-  geom_vline(data = knots, aes(xintercept = x), col = "grey20", size = 0.3, linetype = "dashed") +
-  geom_point(col = "red", alpha = 0.7) +
-  theme(panel.grid = element_blank()) +
-  xlab("") +
-  ylab("Observations") +
-  geom_smooth(method = "gam", formula = y ~ s(x, bs = "gp", k = 7)) +
-  coord_cartesian(xlim = c(0, 50))
-gridExtra::grid.arrange(g1, g2, ncol = 1)
-```
-
----
-
 # Effects of changing variance and range
 
 ```{r sim-rf-grid, echo=FALSE, fig.asp=0.7}
@@ -608,7 +546,7 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 
 * Large observation error looks like noise
 
-* $\sigma_{obs}$ >> $\sigma_{O}$, $\sigma_{E}$
+* $\sigma_{obs}$ >> $\sigma_{O}$
 
 ```{r sim-rf-large_phi, echo=FALSE, fig.asp=0.5}
 set.seed(123)
@@ -642,36 +580,9 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 
 ---
 
-# Moderate observation errors
-
-* $\sigma_{obs}$ = $\sigma_{O}$ = $\sigma_{E}$
-
-```{r sim-rf-med_phi, echo = FALSE, fig.asp=0.5}
-sim_dat <- sdmTMB_simulate(
-  formula = ~1,
-  data = predictor_dat,
-  time = "year",
-  mesh = mesh,
-  family = gaussian(link = "identity"),
-  range = 0.5,
-  sigma_E = 0.1,
-  phi = 0.1,
-  sigma_O = 0.1,
-  seed = 3542,
-  B = 0.2 # B0 = intercept
-)
-
-ggplot(sim_dat, aes(X, Y, col = observed)) +
-  geom_point(alpha=0.7, size=3) +
-  scale_color_gradient2()
-```
-
-
----
-
 # Small observation errors
 
-* $\sigma_{obs}$ << $\sigma_{O}$, $\sigma_{E}$
+* $\sigma_{obs}$ << $\sigma_{O}$
 
 ```{r sim-rf-small_phi, echo = FALSE, fig.asp=0.5}
 sim_dat <- sdmTMB_simulate(
@@ -697,19 +608,20 @@ ggplot(sim_dat, aes(X, Y, col = observed)) +
 
 class: center, middle, inverse
 
-# SPDE approach: what you need to know
+# SPDE approach: what you need to know<br>(*and a bit extra in case you find this stuff thrilling*)
 
 ---
 
 # Estimating Gaussian random fields
 
 .small[
-* Georeferenced data often involve 1000s or more points
+Georeferenced data often involve 1000s or more points
 
-* Like in the 1-D setting, we need to approximate the spatial field
-  * Options include nearest neighbor methods, covariance tapering, etc.
+We need to approximate the spatial field
 
-* sdmTMB uses the SPDE approach from INLA
+Options include nearest neighbor methods, covariance tapering, predictive process models, binning, etc.
+
+sdmTMB uses the SPDE approach from INLA
   * for VAST users, this is the same
   * INLA books:
     <https://www.r-inla.org/learnmore/books>
@@ -744,9 +656,9 @@ class: center, middle, inverse
 --
 
 .xsmall[
-* INLA is software that performs data wrangling for SPDE estimation
+* INLA/fmesher performs data wrangling for SPDE estimation
   * INLA also performs approximate Bayesian estimation
-  * sdmTMB uses fmesher/INLA to wrangle matrices, but uses TMB for maximum likelihood estimation
+  * sdmTMB uses fmesher to wrangle matrices, but uses TMB for maximum marginal likelihood estimation
 ]
 
 .tiny[
@@ -805,7 +717,7 @@ ggplot() +
 
 sdmTMB has a function `make_mesh()` to quickly construct a basic mesh
 
-But sdmTMB can also work with any fancier fmesher mesh.
+But sdmTMB can also work with any fancier fmesher package meshes.
 
 ---
 
@@ -846,7 +758,7 @@ ggplot() +
 
 ---
 
-# SPDE matrices
+# SPDE matrices (*extra*)
 
 With the mesh, we can calculate 3 sparse matrices needed to calculate the precision matrix $\boldsymbol{Q}$
 
@@ -860,7 +772,7 @@ $$
 
 ---
 
-# Getting back from $\tau$ to variance
+# Getting back from $\tau$ to variance (*extra*)
 
 .xsmall[
 With this precision matrix representation of the Matérn, we need a way of converting from $\tau$ back to variance $\sigma^2$:
@@ -925,7 +837,7 @@ cowplot::plot_grid(sim_g3, sim_g4, align = "v")
 
 ---
 
-# Interpolation from mesh to data
+# Interpolation from mesh to data (*extra*)
 
 .small[
 We usually interpolate from the mesh vertices (the random effects) to any observation or prediction locations using an interpolation (or "projection") matrix.
@@ -946,7 +858,7 @@ dim(A) # interpolation matrix dimensions
 
 ---
 
-# Putting it all together
+# Putting it all together (*extra*)
 
 .xsmall[
 **Before fitting:**
@@ -983,6 +895,8 @@ background-size: 100%
 
 # The good news
 
-This is what sdmTMB does for you. 🤓
+<br>
+<br>
+.xlarge[sdmTMB does those steps for you 🤓]
 
 

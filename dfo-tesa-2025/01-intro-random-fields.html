@@ -306,31 +306,6 @@ Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussia
 
 ---
 
-# Predictive process models
-
-* Estimate spatial field as random effects
-
---
-
-* High dimensional datasets computationally challenging
-
---
-
-* Gaussian process predictive process models:
-  * Estimate values at a subset of locations in the time series
-  *   'knots', 'vertices', or 'control points'
-  * Use covariance function to interpolate from knots to locations of observations
-
----
-
-# Predictive process models
-
-* More knots (vertical dashed lines) = more wiggliness &amp; parameters to estimate
-
-&lt;img src="01-intro-random-fields_files/figure-html/show-gp-1.png" width="700px" style="display: block; margin: auto;" /&gt;
-
----
-
 # Effects of changing variance and range
 
 &lt;img src="01-intro-random-fields_files/figure-html/sim-rf-grid-1.png" width="700px" style="display: block; margin: auto;" /&gt;
@@ -341,24 +316,15 @@ Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussia
 
 * Large observation error looks like noise
 
-* `\(\sigma_{obs}\)` &gt;&gt; `\(\sigma_{O}\)`, `\(\sigma_{E}\)`
+* `\(\sigma_{obs}\)` &gt;&gt; `\(\sigma_{O}\)`
 
 &lt;img src="01-intro-random-fields_files/figure-html/sim-rf-large_phi-1.png" width="700px" style="display: block; margin: auto;" /&gt;
 
 ---
 
-# Moderate observation errors
-
-* `\(\sigma_{obs}\)` = `\(\sigma_{O}\)` = `\(\sigma_{E}\)`
-
-&lt;img src="01-intro-random-fields_files/figure-html/sim-rf-med_phi-1.png" width="700px" style="display: block; margin: auto;" /&gt;
-
-
----
-
 # Small observation errors
 
-* `\(\sigma_{obs}\)` &lt;&lt; `\(\sigma_{O}\)`, `\(\sigma_{E}\)`
+* `\(\sigma_{obs}\)` &lt;&lt; `\(\sigma_{O}\)`
 
 &lt;img src="01-intro-random-fields_files/figure-html/sim-rf-small_phi-1.png" width="700px" style="display: block; margin: auto;" /&gt;
 
@@ -366,19 +332,20 @@ Lindgren, F., Rue, H., and Lindström, J. 2011. An explicit link between Gaussia
 
 class: center, middle, inverse
 
-# SPDE approach: what you need to know
+# SPDE approach: what you need to know&lt;br&gt;(*and a bit extra in case you find this stuff thrilling*)
 
 ---
 
 # Estimating Gaussian random fields
 
 .small[
-* Georeferenced data often involve 1000s or more points
+Georeferenced data often involve 1000s or more points
 
-* Like in the 1-D setting, we need to approximate the spatial field
-  * Options include nearest neighbor methods, covariance tapering, etc.
+We need to approximate the spatial field
 
-* sdmTMB uses the SPDE approach from INLA
+Options include nearest neighbor methods, covariance tapering, predictive process models, binning, etc.
+
+sdmTMB uses the SPDE approach from INLA
   * for VAST users, this is the same
   * INLA books:
     &lt;https://www.r-inla.org/learnmore/books&gt;
@@ -413,9 +380,9 @@ class: center, middle, inverse
 --
 
 .xsmall[
-* INLA is software that performs data wrangling for SPDE estimation
+* INLA/fmesher performs data wrangling for SPDE estimation
   * INLA also performs approximate Bayesian estimation
-  * sdmTMB uses fmesher/INLA to wrangle matrices, but uses TMB for maximum likelihood estimation
+  * sdmTMB uses fmesher to wrangle matrices, but uses TMB for maximum marginal likelihood estimation
 ]
 
 .tiny[
@@ -468,7 +435,7 @@ The SPDE approach involves a triangulation over the area of interest; we call th
 
 sdmTMB has a function `make_mesh()` to quickly construct a basic mesh
 
-But sdmTMB can also work with any fancier fmesher mesh.
+But sdmTMB can also work with any fancier fmesher package meshes.
 
 ---
 
@@ -491,7 +458,7 @@ But sdmTMB can also work with any fancier fmesher mesh.
 
 ---
 
-# SPDE matrices
+# SPDE matrices (*extra*)
 
 With the mesh, we can calculate 3 sparse matrices needed to calculate the precision matrix `\(\boldsymbol{Q}\)`
 
@@ -505,7 +472,7 @@ $$
 
 ---
 
-# Getting back from `\(\tau\)` to variance
+# Getting back from `\(\tau\)` to variance (*extra*)
 
 .xsmall[
 With this precision matrix representation of the Matérn, we need a way of converting from `\(\tau\)` back to variance `\(\sigma^2\)`:
@@ -525,7 +492,7 @@ Note that `\(\tau\)` is inverse to `\(\sigma\)`.
 
 ---
 
-# Interpolation from mesh to data
+# Interpolation from mesh to data (*extra*)
 
 .small[
 We usually interpolate from the mesh vertices (the random effects) to any observation or prediction locations using an interpolation (or "projection") matrix.
@@ -550,7 +517,7 @@ dim(A) # interpolation matrix dimensions
 
 ---
 
-# Putting it all together
+# Putting it all together (*extra*)
 
 .xsmall[
 **Before fitting:**
@@ -587,7 +554,9 @@ background-size: 100%
 
 # The good news
 
-This is what sdmTMB does for you. 🤓
+&lt;br&gt;
+&lt;br&gt;
+.xlarge[sdmTMB does those steps for you 🤓]
 
 
     </textarea>
