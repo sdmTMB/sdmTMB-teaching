@@ -92,7 +92,7 @@ plot_anisotropy(fit_iid)
 
 ## Set up prediction grid
 
-To calculate abundance indices, we need a prediction grid. We'll also create a lookup table to track which survey(s) occurred in each year.
+To calculate abundance indices, we need a prediction grid. We'll also create a look-up table to track which survey(s) occurred in each year.
 
 ```{r}
 # Use the standard HBLL inside grid:
@@ -314,7 +314,7 @@ simulate(fit_iid, 200, type = "mle-mvn") |> dharma_residuals(fit_iid)
 
 # Cross-validation
 
-Leave-future-out cross-validation can help assess predictive performance. This takes a while to run!
+Leave-future-out cross-validation can help assess predictive performance. It's not a perfect solution here, but I'm including it as an example of leave-future-out cross validation. This takes a while to run!
 
 ```{r}
 library(future)
@@ -336,7 +336,7 @@ cv_iid <- sdmTMB_cv(
   lfo_forecast = 1,
   lfo_validations = 10,
   control = sdmTMBcontrol(
-    start = list(re_cov_pars = matrix(10, 1, 1)), # weak SD penalty on random intercept
+    start = list(re_cov_pars = matrix(10, 1, 1)), # fixed weak SD penalty on random intercept
     map = list(re_cov_pars = factor(NA))
   )
 )
@@ -429,7 +429,7 @@ cv_summary <- cv_results |>
 cv_summary
 ```
 
-The log predictive density differences tell us about predictive performance. The SE accounts for variability across folds. As a rule of thumb, differences exceeding about 2 SE are generally considered meaningful.
+The log predictive density differences tell us about predictive performance. The SE accounts for variability across folds.
 
 ### Exercise:
 
@@ -437,14 +437,16 @@ The log predictive density differences tell us about predictive performance. The
 2.  How is this different from standard k-fold cross-validation?
 3.  Looking at the fold-wise plot, does one model consistently outperform the others, or are differences driven by specific folds?
 4.  What are pragmatic reasons for picking the random walk random field model over the annual mean random walk model?
-5.  Is there a natural experiment we could use to evaluate the see-saw effect for one year? 6 How might we design a simulation experiment to choose a model?
+5.  Is there a natural experiment we could use to evaluate the see-saw effect for one year?
+6.  How might we design a simulation experiment to choose a model?
 
 # Key principles
 
 -   This is hard and we don't have all the answers
+-   Most expanded area models are more straightforward; hopefully you don't have problems as hard as this!
 -   AIC and residuals alone aren't going to save you
--   Be creative with visualizations
+-   Be creative with visualizations and calculated diagnostic statistics
+-   Random walk random fields will nearly always solve "see-saws" but can overly penalize time; can be assessed via self simulation and re-fitting
 -   Penalize time as little as possible *in a stock assessment context*
--   Try to think of creative ways to use cross validation
--   Random walk random fields will also "work" but can over penalize time
--   If you have to, simulation testing can help answer thorny questions
+-   Try to think of creative ways to use cross validation and natural experiments
+-   If you have to, simulation testing can help answer many thorny questions

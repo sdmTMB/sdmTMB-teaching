@@ -1,6 +1,6 @@
-# DFO TESA Workshop 2023
+# DFO TESA Workshop 2025
 
-January 16--19 2023
+November 4--6 2025
 
 ### sdmTMB:
 
@@ -12,51 +12,57 @@ January 16--19 2023
 
 ### DFO-specific install instructions
 
-<https://github.com/pbs-assess/sdmTMB-teaching/blob/main/dfo-tesa-2023/00-install.Rmd>
+<https://github.com/pbs-assess/sdmTMB-teaching/blob/main/dfo-tesa-2025/00-install.Rmd>
 
 ### Shared Google Docs notes and questions
 
-<https://docs.google.com/document/d/1JScvWtNWrJUfMrUvDZMzWhTUXqsLZSyiN2ULZdaihZk/edit#>
+<https://docs.google.com/document/d/1tCldIs2B9-AeCZM-6ss8Qhn2MSw4wtxKuXkjoRzgneg/edit?tab=t.0>
 
 ### Draft manuscript:
 
-[Original preprint](https://doi.org/10.1101/2022.03.24.485545)
-
-[Updated draft](https://www.dropbox.com/s/bejw28ykmfw2l94/sdmTMB-preprint-jss.pdf?dl=1)
+[In press paper on sdmTMB at the Journal of Statistical Software](https://doi.org/10.1101/2022.03.24.485545)
 
 ### Exercises:
 
-<https://github.com/pbs-assess/sdmTMB-teaching/tree/main/dfo-tesa-2023/exercises>
+<https://github.com/pbs-assess/sdmTMB-teaching/tree/main/dfo-tesa-2025/exercises>
 
 ### Slides:
 
-1. [Introduction to random fields](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/01-intro-random-fields.html)
+1. [Introduction to the course, random fields, and the SPDE](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/01-intro-random-fields.html)
 
-2. [Introduction to sdmTMB](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/02-intro-sdmTMB.html)
+2. [Introduction to sdmTMB](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/02-intro-sdmTMB.html)
 
-3. [Pacific Cod spatial example](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/03-pcod-spatial.html)
+3. [Spatial modeling of Pacific cod example](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/03-fitting-spatial.html)
 
-4. [Pacific Cod spatiotemporal example](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/04-pcod-spatiotemporal.html)
+4. [Spatiotemporal modeling of Pacific cod example](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/04-fitting-spatiotemporal.html)
 
-5. [Comparing models](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/05-comparing-models.html)
+5. [Model comparison and validation](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/05-comparing-models.html)
 
-6. [Families](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/06-families.html)
+6. [Residuals](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/06-residuals.html)
 
-7. [Time-varying coefficients](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/07-time-varying.html)
+7. [Families](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/07-families.html)
 
-8. [Spatially varying coefficients](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/08-spatial-varying.html)
+8. [Time-varying coefficients](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/08-time-varying.html)
 
-9. [Index standardization](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/09-index-standardization.html)
+9. [Spatially varying coefficients](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/09-spatial-varying.html)
 
-10. [Forecasting](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/10-forecasting.html)
+10. [Area-weighted index standardization](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/10-index-standardization.html)
 
-11. [Physical barriers](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/11-barrier-models.html)
+11. [Data integration](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/11-integrated.html)
 
-12. [Priors and bounds](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/12-priors.html)
+12. [Forecasting](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/12-forecasting.html)
 
-13. [Presence-only models](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/13-presence-only.html)
+13. [Simulation](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/13-simulation.html)
 
-14. [Troubleshooting, tips, and tricks](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2023/14-extra.html)
+Additional topics:
+
+- [Random fields with physical barriers](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/99-barrier-models.html)
+
+- [Priors and parameter bounds](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/99-priors.html)
+
+- [Spatial modeling of presence-only data](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/99-presence-only.html)
+
+- [Related packages, troubleshooting, Q+A, tips](https://pbs-assess.github.io/sdmTMB-teaching/dfo-tesa-2025/99-extra.html)
 
 ### GitHub folder for these slides:
 
