@@ -1,0 +1,85 @@
+---
+title: Software setup for model-based estimates of abundance from survey data
+---
+
+1. Install the following programs:
+
+- R 4.5.1 (or 4.4 or higher)
+- RStudio latest version
+
+2. In R, install sdmTMB from CRAN
+
+```{r, eval=FALSE}
+install.packages("sdmTMB", dependencies = TRUE)
+```
+
+- If asked if you'd like to update any packages, say yes.
+- If CRAN asks if you'd like to build a newer package from source,
+  feel free to say no.
+- Sometimes some packages fail to install. If any
+  packages fail (e.g. 'non-zero exist status), try installing them
+  separately and then trying to install sdmTMB again.
+
+If you get a warning like this:
+
+```
+TMB was built with Matrix version 1.5.3
+Current Matrix version is 1.5.1
+Please re-install 'TMB' from source using
+install.packages('TMB', type = 'source') or ask
+CRAN for a binary version of 'TMB' matching CRAN's
+'Matrix' package
+```
+
+You can safely ignore it (if you want to squash the warning, you can
+install TMB from source as described).
+
+3. Test to make sure everything is working:
+
+```{r, eval=FALSE}
+library(sdmTMB)
+fit <- sdmTMB(
+  density ~ s(depth),
+  data = pcod_2011, 
+  mesh = pcod_mesh_2011,
+  family = tweedie(link = "log")
+)
+fit
+```
+
+If successful, you should see this:
+
+```
+Spatial model fit by ML ['sdmTMB']
+Formula: density ~ s(depth)
+Mesh: pcod_mesh_2011 (isotropic covariance)
+Data: pcod_2011
+Family: tweedie(link = 'log')
+ 
+Conditional model:
+            coef.est coef.se
+(Intercept)     2.16    0.34
+sdepth          1.94    3.13
+
+Smooth terms:
+             Std. Dev.
+sd__s(depth)     13.07
+
+Dispersion parameter: 13.68
+Tweedie p: 1.58
+Matérn range: 16.84
+Spatial SD: 2.20
+ML criterion at convergence: 2937.789
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+```
+
+Again, you can ignore any warnings about Matrix/TMB versions if you see those.
+
+## Other packages, including mgcv package for fitting GAMs:
+
+```{r}
+pkgs <- c("dplyr", "ggplot2", "sf", "inlabru", "gratia", "visreg", "purrr")
+install.packages(pkgs)
+install.packages("mgcv", dependencies = TRUE)
+```
