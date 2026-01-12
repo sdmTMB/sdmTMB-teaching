@@ -1,11 +1,12 @@
 ---
 title: "Software setup for model-based estimates of abundance from survey data"
+output: pdf_document
 ---
 
 1. Install the following programs:
 
 - R 4.5.1 (or 4.4 or higher)
-- RStudio latest version
+- RStudio recent or latest version
 
 2. In R, install sdmTMB from CRAN
 
@@ -78,7 +79,7 @@ Again, you can ignore any warnings about Matrix/TMB versions if you see those.
 
 ## Other packages, including mgcv package for fitting GAMs:
 
-```{r}
+```{r, eval=FALSE}
 pkgs <- c("dplyr", "ggplot2", "sf","mgcv", "gratia", "visreg", "purrr") #"inlabru"
 install.packages(pkgs, dependencies = TRUE,
                  repos = 'http://cran.us.r-project.org')
