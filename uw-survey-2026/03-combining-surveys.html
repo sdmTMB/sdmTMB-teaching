@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>UW FISH 572 Survey Science</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Lewis Barnett &amp; Eric Ward" />
+    <meta name="date" content="2026-02-02" />
+    <script src="libs/header-attrs-2.30/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="theme.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# UW FISH 572 Survey Science
+]
+.subtitle[
+## Model based combination of multiple surveys
+]
+.author[
+### Lewis Barnett &amp; Eric Ward
+]
+.institute[
+### Alaska Fisheries Science Center
+]
+.date[
+### February 2, 2026
+]
+
+---
+
+
+&lt;!-- Build with: xaringan::inf_mr() --&gt;
+
+
+
+
+
+# Outline
+
+* There are lots of approaches for combining data from multiple surveys
+
+* These approaches are by no means exhaustive, but represent some of the 
+more common situations 
+
+* Also lots of great existing teaching material w/examples:
+
+[2023 IMR sdmTMB workshop](https://github.com/sdmTMB/sdmTMB-teaching/blob/b5b19e147a064b8e212a51ece7135c6b5a04b8c8/imr-2023/09-combining-surveys.Rmd#L2)
+
+[2025 DFO sdmTMB workshop](https://github.com/sdmTMB/sdmTMB-teaching/blob/b5b19e147a064b8e212a51ece7135c6b5a04b8c8/dfo-tesa-2025/exercises/06-integrated.qmd#L2)
+---
+
+# Assumptions
+
+* When surveys are combined, we assume the spatial parameters are shared (range, variance)
+
+* Catchability and trends may differ by regions
+
+* To create a robust index, we want to account for these major sources of variability
+
+---
+
+# Example 1: spatially adjacent surveys 
+
+* 2 bottom trawl surveys: Bering Sea and Aleutian Islands
+
+* Focus on years when both conducted: 2004, 2006, 2010, 2012, 2014, 
+2016, 2018, 2022, 2024
+* We'll use arrowtooth flounder for this case study
+
+---
+
+# General approach for all models
+
+* Mesh uses a cutoff distance of 25 km
+
+* We use a delta - lognormal distribution to separately model occurrence and catch rates
+
+* Spatial and spatiotemporal models included 
+
+* Catch weight as a response, with log(effort) as an offset
+
+---
+
+# The data
+
+* Access via 'surveyjoin' R package 
+
+* Extracted data included here
+
+* Eastern Bering Sea index will be our focus, its grid also included 
+
+
+---
+
+# Modelling common trends across surveys
+
+* What are the individual arguments for this model doing? 
+
+
+``` r
+mesh &lt;- make_mesh(arrowtooth, 
+                  xy_cols = c("X","Y"), 
+                  cutoff = 25)
+
+fit &lt;- sdmTMB(catch_weight ~ 0 + fyear,
+        data = arrowtooth,
+        offset = log(arrowtooth$effort),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "year")
+```
+
+---
+
+# Generating the index
+
+* Recall that after fitting, generating the index involves several steps
+
+* The prediction grid needs to be replicated for each year, and it needs
+to include everything from our model
+
+
+``` r
+nd &lt;- sdmTMB::replicate_df(ebs_grid, "year", 
+                   unique(arrowtooth$year))
+nd &lt;- sdmTMB::add_utm_columns(nd, 
+                      ll_names = c("lon","lat"), 
+                      utm_crs = 32602)
+nd$fyear &lt;- as.factor(nd$year)
+```
+
+---
+
+# Generating the index
+
+* Next, we can predict to our grid
+
+
+``` r
+pred &lt;- predict(fit, newdata = nd, 
+                 return_tmb_object = TRUE)
+```
+* And finally, we can generate the index
+
+
+``` r
+index &lt;- get_index(pred, bias_correct = TRUE)
+```
+
+---
+
+# Generating the index
+
+
+``` r
+head(index)
+#&gt;   year      est      lwr       upr  log_est         se se_natural  type
+#&gt; 1 2004 814337.2 651793.9 1017415.2 13.61013 0.11359702   745593.5 index
+#&gt; 2 2006 876845.3 684144.2 1123824.1 13.68409 0.12661556   803065.5 index
+#&gt; 3 2010 700243.4 554718.9  883944.7 13.45918 0.11886264   638856.0 index
+#&gt; 4 2012 440587.6 344306.8  563791.9 12.99586 0.12580637   400936.1 index
+#&gt; 5 2014 728674.6 584317.7  908695.1 13.49898 0.11264613   666788.9 index
+#&gt; 6 2016 893450.7 736054.1 1084504.6 13.70285 0.09887296   818406.3 index
+```
+
+---
+
+# Modelling different catchability by survey
+
+* Add survey offset allowing catchability to differ
+
+* If we only want to change a few things, we can use `update()`
+
+
+``` r
+fit2 &lt;- update(fit, 
+        formula = catch_weight ~ 0 + fyear + survey_name)
+```
+
+
+---
+
+# Modelling survey specific trends
+
+* The catchability estimate here is significantly positive
+* What does this mean? 
+
+``` r
+tidy(fit2)[,c("term","estimate","std.error")]
+#&gt; # A tibble: 10 × 3
+#&gt;    term                          estimate std.error
+#&gt;    &lt;chr&gt;                            &lt;dbl&gt;     &lt;dbl&gt;
+#&gt;  1 fyear2004                        -6.38      5.09
+#&gt;  2 fyear2006                        -7.82      5.10
+#&gt;  3 fyear2010                        -7.66      5.10
+#&gt;  4 fyear2012                        -8.44      5.11
+#&gt;  5 fyear2014                        -6.87      5.09
+#&gt;  6 fyear2016                        -4.23      5.09
+#&gt;  7 fyear2018                        -2.33      5.08
+#&gt;  8 fyear2022                        -5.89      5.09
+#&gt;  9 fyear2024                        -6.52      5.09
+#&gt; 10 survey_nameeastern Bering Sea    11.8       4.05
+```
+
+---
+
+# Updating the indices
+
+* We can turn the crank and generate the index from this new model
+  (code hidden but is on slides)
+
+
+* Because catchability just moves the intercept up/down we expect the indices to be perfectly correlated (and they are!)
+
+``` r
+cor(index$est, index2$est)
+#&gt; [1] 0.9998295
+```
+
+---
+
+# Visualizing the indices
+
+* However the scale is also exactly the same - why??
+&lt;img src="03-combining-surveys_files/figure-html/unnamed-chunk-10-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+
+---
+
+# Let's see what's going on with the spatial parameters
+
+* These look relatively similar
+
+```
+#&gt; # A tibble: 3 × 6
+#&gt;   model term    estimate std.error conf.low conf.high
+#&gt;   &lt;dbl&gt; &lt;chr&gt;      &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;
+#&gt; 1     1 range     666.      85.3     518.      857.  
+#&gt; 2     1 sigma_O     5.69     0.797     4.32      7.49
+#&gt; 3     1 sigma_E     1.73     0.186     1.41      2.14
+```
+
+
+```
+#&gt; # A tibble: 3 × 6
+#&gt;   model term    estimate std.error conf.low conf.high
+#&gt;   &lt;dbl&gt; &lt;chr&gt;      &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;
+#&gt; 1     1 range     728.      94.5     565.      939.  
+#&gt; 2     1 sigma_O     6.07     0.856     4.61      8.00
+#&gt; 3     1 sigma_E     1.78     0.199     1.43      2.22
+```
+
+---
+
+# Let's see what's going on with the spatial parameters
+
+* Spatial fields' flexibility is able to account for catchability when it's not explicitly included
+&lt;img src="03-combining-surveys_files/figure-html/unnamed-chunk-13-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Modelling survey specific trends
+
+* We can also let catchability/trends vary by survey  
+
+
+``` r
+fit3 &lt;- update(fit, 
+        formula = catch_weight ~ 0 + fyear * survey_name)
+```
+* On your own: inspect how the spatial parameters and fields
+differ from our previous approaches
+
+
+
+---
+
+# Example 2: surveys with confounding in space-time 
+
+* In the previous example, spatially adjacent surveys were collected in the same year
+
+* Enables us to separate out space/time effects
+
+* This is not always the case -- Sean Anderson (DFO) has been working on this with 'checkerboard' survey designs
+
+---
+
+# Illustrating the issue with the Alaska data
+
+* We'll filter these datasets to be non-overlapping
+
+
+---
+
+# Updating the model fit with the new data 
+
+* We'll keep the initial model, but here just swap in the new subset of data
+
+``` r
+mesh &lt;- make_mesh(arrow2, 
+                  xy_cols = c("X","Y"), 
+                  cutoff = 25)
+
+fit4 &lt;- sdmTMB(catch_weight ~ 0 + fyear,
+        data = arrow2,
+        offset = log(arrow2$effort),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "year")
+```
+---
+
+# Something is clearly wrong!
+
+* Charasteristic see-saw pattern (unrealistic)
+
+
+
+``` r
+head(index4)
+#&gt;   year        est         lwr       upr  log_est        se se_natural  type
+#&gt; 1 2004   45363.90    342.1055 6015346.1 10.72247 2.4935931   11132.40 index
+#&gt; 2 2006  917028.82 700045.9200 1201266.7 13.72889 0.1377540  829722.37 index
+#&gt; 3 2010   85433.32   1489.5572 4900014.8 11.35549 2.0659856   29496.35 index
+#&gt; 4 2012  495021.09 378502.4939  647408.9 13.11236 0.1369299  446472.29 index
+#&gt; 5 2014   75781.53    930.5489 6171454.4 11.23561 2.2448551   22418.77 index
+#&gt; 6 2016 1027844.23 824230.0411 1281758.4 13.84297 0.1126394  928647.37 index
+```
+
+---
+
+# Possible solutions
+
+* If years are continuous (2003, 2004, 2005, ...)
+    - Include smooth or AR(1) on year effects and spatiotemporal fields 
+    - `time_varying` formula
+    - `time_varying_type` argument
+    
+* Can also turn spatiotemporal `off`
+---
+
+# Example 3: overlapping surveys 
+
+* Case study data: Triennial and annual bottom trawl survey from USA west coast
+
+* These surveys overlap spatially (slightly) and both occurred 2003-2004
+
+``` r
+remotes::install_github("pfmc-assessments/nwfscSurvey")
+
+catch_wcgbts &lt;- nwfscSurvey::pull_catch(survey = 
+        "NWFSC.Combo",
+        common_name = "arrowtooth flounder",
+        years = c(2003, 2024))
+catch_triennial &lt;- nwfscSurvey::pull_catch(survey = 
+        "Triennial",
+        common_name = "arrowtooth flounder",
+        years = c(1900, 2004))
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* Next we'll join the survey data 
+
+
+``` r
+catch_wcgbts$survey &lt;- "WCGBTS"
+catch_triennial$survey &lt;- "Triennial"
+catch &lt;- rbind(catch_wcgbts, catch_triennial)
+
+# add utm
+catch &lt;- sdmTMB::add_utm_columns(catch, 
+         ll_names = c("Longitude_dd","Latitude_dd"))
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+&lt;img src="03-combining-surveys_files/figure-html/unnamed-chunk-22-1.png" width="700px" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Example 3: overlapping surveys 
+
+* Like before, we start by constructing the mesh
+
+``` r
+mesh &lt;- sdmTMB::make_mesh(catch,
+                          xy_cols = c("X","Y"),
+                          cutoff = 25)
+
+mesh$mesh$n
+#&gt; [1] 299
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* Next we fit the model 
+
+``` r
+catch$fyear &lt;- as.factor(catch$Year)
+fit5 &lt;- sdmTMB(cpue_kg_km2 ~ 0 + fyear + survey,
+        data = catch,
+        offset = log(catch$Area_swept_ha),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "Year")
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* As before we need to prep the prediction grid
+
+
+``` r
+grid &lt;- readRDS("surveyjoin_wcgbts_grid.rds")
+nd &lt;- sdmTMB::replicate_df(grid, "Year", 
+                   unique(catch$Year))
+nd$fyear &lt;- as.factor(nd$Year)
+nd$survey &lt;- "WCGBTS"
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* And generate the index
+
+
+``` r
+pred5 &lt;- predict(fit5, newdata = nd, 
+                 return_tmb_object = TRUE)
+index5 &lt;- get_index(pred5, bias_correct = TRUE)
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

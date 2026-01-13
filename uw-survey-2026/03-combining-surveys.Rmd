@@ -1,0 +1,441 @@
+---
+title: "UW FISH 572 Survey Science"
+subtitle: "Model based combination of multiple surveys"
+author: "Lewis Barnett & Eric Ward"
+institute: "Alaska Fisheries Science Center"
+date: "February 2, 2026"
+output:
+  xaringan::moon_reader:
+    css: ["xaringan-themer.css", "theme.css"]
+    lib_dir: libs
+    nature:
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+<!-- Build with: xaringan::inf_mr() -->
+
+```{r preamble, include=FALSE, cache=FALSE}
+source(here::here("uw-survey-2026/preamble.R"))
+do.call(knitr::opts_chunk$set, knitr_opts)
+```
+
+```{r libs, include=FALSE}
+library(dplyr)
+library(sdmTMB)
+library(ggplot2)
+library(mgcv)
+```
+
+# Outline
+
+* There are lots of approaches for combining data from multiple surveys
+
+* These approaches are by no means exhaustive, but represent some of the 
+more common situations 
+
+* Also lots of great existing teaching material w/examples:
+
+[2023 IMR sdmTMB workshop](https://github.com/sdmTMB/sdmTMB-teaching/blob/b5b19e147a064b8e212a51ece7135c6b5a04b8c8/imr-2023/09-combining-surveys.Rmd#L2)
+
+[2025 DFO sdmTMB workshop](https://github.com/sdmTMB/sdmTMB-teaching/blob/b5b19e147a064b8e212a51ece7135c6b5a04b8c8/dfo-tesa-2025/exercises/06-integrated.qmd#L2)
+---
+
+# Assumptions
+
+* When surveys are combined, we assume the spatial parameters are shared (range, variance)
+
+* Catchability and trends may differ by regions
+
+* To create a robust index, we want to account for these major sources of variability
+
+---
+
+# Example 1: spatially adjacent surveys 
+
+* 2 bottom trawl surveys: Bering Sea and Aleutian Islands
+
+* Focus on years when both conducted: 2004, 2006, 2010, 2012, 2014, 
+2016, 2018, 2022, 2024
+* We'll use arrowtooth flounder for this case study
+
+---
+
+# General approach for all models
+
+* Mesh uses a cutoff distance of 25 km
+
+* We use a delta - lognormal distribution to separately model occurrence and catch rates
+
+* Spatial and spatiotemporal models included 
+
+* Catch weight as a response, with log(effort) as an offset
+
+---
+
+# The data
+
+* Access via 'surveyjoin' R package 
+
+* Extracted data included here
+
+* Eastern Bering Sea index will be our focus, its grid also included 
+
+```{r}
+arrowtooth <- readRDS("surveyjoin_ak_arrowtooth.rds")
+ebs_grid <- readRDS("surveyjoin_ebs_grid.rds")
+```
+---
+
+# Modelling common trends across surveys
+
+* What are the individual arguments for this model doing? 
+
+```{r eval=TRUE, echo=TRUE}
+mesh <- make_mesh(arrowtooth, 
+                  xy_cols = c("X","Y"), 
+                  cutoff = 25)
+
+fit <- sdmTMB(catch_weight ~ 0 + fyear,
+        data = arrowtooth,
+        offset = log(arrowtooth$effort),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "year")
+```
+
+---
+
+# Generating the index
+
+* Recall that after fitting, generating the index involves several steps
+
+* The prediction grid needs to be replicated for each year, and it needs
+to include everything from our model
+
+```{r make-grid, echo = TRUE}
+nd <- sdmTMB::replicate_df(ebs_grid, "year", 
+                   unique(arrowtooth$year))
+nd <- sdmTMB::add_utm_columns(nd, 
+                      ll_names = c("lon","lat"), 
+                      utm_crs = 32602)
+nd$fyear <- as.factor(nd$year)
+```
+
+---
+
+# Generating the index
+
+* Next, we can predict to our grid
+
+```{r echo = TRUE}
+pred <- predict(fit, newdata = nd, 
+                 return_tmb_object = TRUE)
+```
+* And finally, we can generate the index
+
+```{r echo = TRUE}
+index <- get_index(pred, bias_correct = TRUE)
+```
+
+---
+
+# Generating the index
+
+```{r echo=TRUE}
+head(index)
+```
+
+---
+
+# Modelling different catchability by survey
+
+* Add survey offset allowing catchability to differ
+
+* If we only want to change a few things, we can use `update()`
+
+```{r echo=TRUE}
+fit2 <- update(fit, 
+        formula = catch_weight ~ 0 + fyear + survey_name)
+```
+
+
+---
+
+# Modelling survey specific trends
+
+* The catchability estimate here is significantly positive
+* What does this mean? 
+```{r echo=TRUE}
+tidy(fit2)[,c("term","estimate","std.error")]
+```
+
+---
+
+# Updating the indices
+
+* We can turn the crank and generate the index from this new model
+  (code hidden but is on slides)
+```{r echo=FALSE}
+pred2 <- predict(fit2, newdata = nd, 
+                 return_tmb_object = TRUE)
+index2 <- get_index(pred2, bias_correct = TRUE)
+```
+
+* Because catchability just moves the intercept up/down we expect the indices to be perfectly correlated (and they are!)
+```{r echo=TRUE}
+cor(index$est, index2$est)
+
+```
+
+---
+
+# Visualizing the indices
+
+* However the scale is also exactly the same - why??
+```{r}
+index$model <- "No catchability"
+index2$model <- "Catchability"
+rbind(index, index2) |> 
+  ggplot(aes(year, est, fill=model, col = model)) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha=0.4) + 
+  geom_line() + xlab("Year") + ylab("Estimate")
+```
+
+
+---
+
+# Let's see what's going on with the spatial parameters
+
+* These look relatively similar
+```{r}
+tidy(fit, "ran_pars")
+```
+
+```{r}
+tidy(fit2, "ran_pars")
+```
+
+---
+
+# Let's see what's going on with the spatial parameters
+
+* Spatial fields' flexibility is able to account for catchability when it's not explicitly included
+```{r echo=FALSE}
+pred$data$model <- "No catchability"
+pred2$data$model <- "Catchability"
+p1 <- rbind(pred$data, pred2$data) |> 
+  dplyr::filter(year == 2024) |>
+  ggplot(aes(X, Y, fill=omega_s1, col = omega_s1)) + 
+  geom_point() + 
+  facet_wrap(~ model)
+p2 <- rbind(pred$data, pred2$data) |> 
+  dplyr::filter(year == 2024) |>
+  ggplot(aes(X, Y, fill=omega_s2, col = omega_s2)) + 
+  geom_point() + 
+  facet_wrap(~ model)
+gridExtra::grid.arrange(p1, p2, nrow=2)
+```
+
+---
+
+# Modelling survey specific trends
+
+* We can also let catchability/trends vary by survey  
+
+```{r echo=TRUE}
+fit3 <- update(fit, 
+        formula = catch_weight ~ 0 + fyear * survey_name)
+```
+* On your own: inspect how the spatial parameters and fields
+differ from our previous approaches
+
+```{r echo=FALSE}
+pred3 <- predict(fit3, newdata = nd, 
+                 return_tmb_object = TRUE)
+index3 <- get_index(pred3, bias_correct = TRUE)
+```
+
+---
+
+# Example 2: surveys with confounding in space-time 
+
+* In the previous example, spatially adjacent surveys were collected in the same year
+
+* Enables us to separate out space/time effects
+
+* This is not always the case -- Sean Anderson (DFO) has been working on this with 'checkerboard' survey designs
+
+---
+
+# Illustrating the issue with the Alaska data
+
+* We'll filter these datasets to be non-overlapping
+```{r}
+ai <- dplyr::filter(arrowtooth, 
+                    survey_name == "Aleutian Islands",
+                    year %in% c(2004, 2010, 2014, 2018, 2024))
+ebs <- dplyr::filter(arrowtooth, 
+                    survey_name == "eastern Bering Sea",
+                    year %in% c(2006, 2012, 2016, 2022))
+arrow2 <- rbind(ai, ebs)
+```
+
+---
+
+# Updating the model fit with the new data 
+
+* We'll keep the initial model, but here just swap in the new subset of data
+```{r echo=TRUE}
+mesh <- make_mesh(arrow2, 
+                  xy_cols = c("X","Y"), 
+                  cutoff = 25)
+
+fit4 <- sdmTMB(catch_weight ~ 0 + fyear,
+        data = arrow2,
+        offset = log(arrow2$effort),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "year")
+```
+---
+
+# Something is clearly wrong!
+
+* Charasteristic see-saw pattern (unrealistic)
+```{r echo=FALSE}
+pred4 <- predict(fit4, newdata = nd, 
+                 return_tmb_object = TRUE)
+index4 <- get_index(pred4, bias_correct = TRUE)
+```
+
+```{r echo=TRUE}
+head(index4)
+```
+
+---
+
+# Possible solutions
+
+* If years are continuous (2003, 2004, 2005, ...)
+    - Include smooth or AR(1) on year effects and spatiotemporal fields 
+    - `time_varying` formula
+    - `time_varying_type` argument
+    
+* Can also turn spatiotemporal `off`
+---
+
+# Example 3: overlapping surveys 
+
+* Case study data: Triennial and annual bottom trawl survey from USA west coast
+
+* These surveys overlap spatially (slightly) and both occurred 2003-2004
+```{r eval=TRUE, echo=TRUE}
+remotes::install_github("pfmc-assessments/nwfscSurvey")
+
+catch_wcgbts <- nwfscSurvey::pull_catch(survey = 
+        "NWFSC.Combo",
+        common_name = "arrowtooth flounder",
+        years = c(2003, 2024))
+catch_triennial <- nwfscSurvey::pull_catch(survey = 
+        "Triennial",
+        common_name = "arrowtooth flounder",
+        years = c(1900, 2004))
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* Next we'll join the survey data 
+
+```{r echo=TRUE}
+catch_wcgbts$survey <- "WCGBTS"
+catch_triennial$survey <- "Triennial"
+catch <- rbind(catch_wcgbts, catch_triennial)
+
+# add utm
+catch <- sdmTMB::add_utm_columns(catch, 
+         ll_names = c("Longitude_dd","Latitude_dd"))
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+```{r}
+ggplot(catch, aes(Longitude_dd, Latitude_dd, col = survey)) + 
+  geom_point(alpha = 0.4, size=0.3)
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* Like before, we start by constructing the mesh
+```{r echo=TRUE}
+mesh <- sdmTMB::make_mesh(catch,
+                          xy_cols = c("X","Y"),
+                          cutoff = 25)
+
+mesh$mesh$n
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* Next we fit the model 
+```{r echo=TRUE}
+catch$fyear <- as.factor(catch$Year)
+fit5 <- sdmTMB(cpue_kg_km2 ~ 0 + fyear + survey,
+        data = catch,
+        offset = log(catch$Area_swept_ha),
+        mesh = mesh,
+        family = delta_lognormal(),
+        spatial="on",
+        spatiotemporal="iid",
+        time = "Year")
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* As before we need to prep the prediction grid
+
+```{r echo=TRUE}
+grid <- readRDS("surveyjoin_wcgbts_grid.rds")
+nd <- sdmTMB::replicate_df(grid, "Year", 
+                   unique(catch$Year))
+nd$fyear <- as.factor(nd$Year)
+nd$survey <- "WCGBTS"
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+* And generate the index
+
+```{r echo=TRUE}
+pred5 <- predict(fit5, newdata = nd, 
+                 return_tmb_object = TRUE)
+index5 <- get_index(pred5, bias_correct = TRUE)
+```
+
+---
+
+# Example 3: overlapping surveys 
+
+```{r echo=FALSE}
+ggplot(index5, aes(Year, est)) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.5) + 
+  geom_line() + ylab("Estimate")
+
+```
+
