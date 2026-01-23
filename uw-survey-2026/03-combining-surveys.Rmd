@@ -51,6 +51,18 @@ more common situations
 
 ---
 
+# Caveats
+
+* Ideally surveys wouldn't differ in selectivity or catchability, but they often do
+
+* Ideally there would be experimental data to leverage when combining 
+surveys with different gears or protocols, but there often isn't
+
+* Best practice would be to combine surveys with more similar methods, but
+we explore a range of examples
+
+---
+
 # Example 1: spatially adjacent surveys 
 
 * 2 bottom trawl surveys: Bering Sea and Aleutian Islands
@@ -306,7 +318,7 @@ fit4 <- sdmTMB(catch_weight ~ 0 + fyear,
 
 # Something is clearly wrong!
 
-* Charasteristic see-saw pattern (unrealistic)
+* Characteristic see-saw pattern (unrealistic)
 ```{r echo=FALSE}
 pred4 <- predict(fit4, newdata = nd, 
                  return_tmb_object = TRUE)
@@ -439,3 +451,11 @@ ggplot(index5, aes(Year, est)) +
 
 ```
 
+# Summary
+
+* If empirical data does not exist to inform intercalibration, spatiotemporal models
+can come to the rescue
+
+* Surveys need to occur in the same year to be more tractable
+
+* Integration works better with overlap in space and time
