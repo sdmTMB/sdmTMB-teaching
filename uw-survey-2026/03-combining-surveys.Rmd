@@ -7,7 +7,9 @@ date: "February 2, 2026"
 output:
   xaringan::moon_reader:
     css: ["xaringan-themer.css", "theme.css"]
-    lib_dir: libs
+    #lib_dir: libs
+    self_contained: true
+    lib_dir: null
     nature:
       highlightLines: true
       countIncrementalSlides: false
